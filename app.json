@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "SavvyFoodie",
+    "slug": "savvyfoodie",
+    "version": "0.2.0",
+    "orientation": "portrait",
+    "scheme": "savvyfoodie",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E8750A"
+      },
+      "package": "com.caroldenissetorres.savvyfoodie"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "SavvyFoodie necesita tu ubicación para mostrarte restaurantes cercanos."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5b6b3c36-2563-4a32-a03f-f7411f327aca"
+      }
+    }
+  }
+}

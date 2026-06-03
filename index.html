@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#08090d" />
+    <meta name="description" content="Encuentra restaurantes reales cercanos con datos de Google Places y abre Google Maps para ver detalles o rutas." />
+    <title>SavvyFoodie</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="top-bar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">🍴</div>
+          <div>
+            <h1>SavvyFoodie</h1>
+            <p id="current-location-chip" class="location-chip">Santa Cruz de Tenerife</p>
+          </div>
+        </div>
+        <button class="avatar-button" type="button" aria-label="Abrir perfil">
+          <img
+            src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80"
+            alt=""
+          />
+        </button>
+      </header>
+
+      <section id="view-explore" class="app-view is-active" data-view="explore" aria-labelledby="category-title">
+        <section class="search-panel" aria-label="Búsqueda de comida">
+          <label for="dish-input" class="sr-only">Buscar comida</label>
+          <div class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="dish-input" type="search" placeholder="Busca tu antojo (ej. hamburguesas)" autocomplete="off" />
+            <button id="search-button" type="button" aria-label="Buscar">→</button>
+          </div>
+        </section>
+
+        <section class="section-block" aria-labelledby="category-title">
+          <h2 id="category-title">Explora por categorías</h2>
+          <div class="category-grid">
+            <button type="button" data-dish="hamburguesas" aria-label="Buscar hamburguesas">
+              <span>🍔</span>
+              <strong>Hamburguesas</strong>
+            </button>
+            <button type="button" data-dish="sushi" aria-label="Buscar sushi">
+              <span>🍣</span>
+              <strong>Sushi</strong>
+            </button>
+            <button type="button" data-dish="pizza" aria-label="Buscar pizza">
+              <span>🍕</span>
+              <strong>Pizza</strong>
+            </button>
+            <button type="button" data-dish="comida saludable" aria-label="Buscar comida saludable">
+              <span>🥗</span>
+              <strong>Saludable</strong>
+            </button>
+            <button type="button" data-dish="tacos" aria-label="Buscar tacos">
+              <span>🌮</span>
+              <strong>Tacos</strong>
+            </button>
+            <button type="button" data-dish="ramen" aria-label="Buscar ramen">
+              <span>🍜</span>
+              <strong>Ramen</strong>
+            </button>
+            <button type="button" data-dish="café" aria-label="Buscar café">
+              <span>☕</span>
+              <strong>Café</strong>
+            </button>
+            <button type="button" data-dish="comida económica" aria-label="Buscar comida económica">
+              <span>💸</span>
+              <strong>Económico</strong>
+            </button>
+          </div>
+        </section>
+
+        <section class="section-block" aria-labelledby="more-category-title">
+          <div class="section-heading">
+            <h2 id="more-category-title">Más categorías</h2>
+          </div>
+          <div class="more-categories">
+            <button type="button" data-dish="pasta">Pasta</button>
+            <button type="button" data-dish="pollo">Pollo</button>
+            <button type="button" data-dish="carne">Carne</button>
+            <button type="button" data-dish="desayuno">Desayuno</button>
+            <button type="button" data-dish="postres">Postres</button>
+            <button type="button" data-dish="vegano">Vegano</button>
+            <button type="button" data-dish="mariscos">Mariscos</button>
+            <button type="button" data-dish="comida india">India</button>
+            <button type="button" data-dish="comida china">China</button>
+            <button type="button" data-dish="kebab">Kebab</button>
+            <button type="button" data-dish="shawarma">Shawarma</button>
+            <button type="button" data-dish="tapas">Tapas</button>
+          </div>
+        </section>
+
+        <section class="section-block results-section" aria-labelledby="results-title">
+          <div class="section-heading">
+            <h2 id="results-title">Mejores resultados</h2>
+            <span id="result-count" class="result-count"></span>
+          </div>
+          <div class="filter-row is-single" aria-label="Filtros de búsqueda">
+            <label>
+              <span>Precio máximo</span>
+              <select id="price-filter">
+                <option value="all">Cualquiera</option>
+                <option value="10">Menos de €10</option>
+                <option value="15">Menos de €15</option>
+                <option value="20">Menos de €20</option>
+              </select>
+            </label>
+            <label>
+              <span>Distancia máxima</span>
+              <select id="distance-filter">
+                <option value="all">Cualquiera</option>
+                <option value="1">1 km</option>
+                <option value="3">3 km</option>
+                <option value="5">5 km</option>
+              </select>
+            </label>
+            <label>
+              <span>Ordenar por</span>
+              <select id="sort-filter">
+                <option value="best">Mejor resultado</option>
+                <option value="nearest">Más cercanos</option>
+                <option value="favorites">Favoritos primero</option>
+              </select>
+            </label>
+          </div>
+          <a id="current-search-maps" class="maps-search-link" href="https://www.google.com/maps/search/restaurant" target="_blank" rel="noreferrer">Usar búsqueda actual en Google Maps</a>
+          <div id="results-list" class="results-list"></div>
+        </section>
+      </section>
+
+      <section id="view-map" class="app-view" data-view="map" aria-labelledby="map-title" hidden>
+        <section class="map-sheet" aria-labelledby="map-title">
+          <div class="section-heading">
+            <h2 id="map-title">Vista de mapa</h2>
+          </div>
+          <div class="map-frame">
+            <iframe
+              id="map-frame"
+              title="Búsqueda de restaurantes en Google Maps"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+              src="https://www.google.com/maps?q=burger%20restaurant&output=embed"
+            ></iframe>
+          </div>
+          <div id="selected-summary" class="selected-summary"></div>
+          <div id="map-place-list" class="map-place-list"></div>
+        </section>
+      </section>
+
+      <section id="view-favorites" class="app-view" data-view="favorites" hidden>
+        <section id="favorites-panel" class="utility-card" aria-labelledby="favorites-title">
+          <div class="section-heading">
+            <h2 id="favorites-title">Favoritos <span id="favorites-count">(0)</span></h2>
+          </div>
+          <p>Los restaurantes guardados aparecerán aquí cuando Google Places esté conectado.</p>
+        </section>
+      </section>
+
+      <section id="view-profile" class="app-view" data-view="profile" hidden>
+        <section class="location-card" aria-live="polite">
+          <div>
+            <strong id="location-title">Usando zona de ejemplo</strong>
+            <p id="location-detail">Permite el acceso a tu ubicación o busca cualquier ciudad, zona o dirección del mundo.</p>
+          </div>
+          <div class="location-controls">
+            <button id="location-button" type="button">Usar mi ubicación</button>
+            <div class="location-search">
+              <label for="location-input" class="sr-only">Buscar ubicación</label>
+              <input id="location-input" type="search" placeholder="Buscar ubicación en todo el mundo" autocomplete="off" />
+              <div id="location-suggestions" class="location-suggestions" role="listbox" aria-label="Sugerencias de ubicación" hidden></div>
+            </div>
+          </div>
+          <p class="location-attribution">
+            Búsqueda de ubicación por
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>.
+          </p>
+        </section>
+
+        <section id="profile-panel" class="utility-card" aria-labelledby="profile-title">
+          <div class="section-heading">
+            <h2 id="profile-title">Ajustes</h2>
+          </div>
+          <div class="settings-grid">
+            <label class="setting-field">
+              <span>Idioma</span>
+              <select id="language-setting">
+                <option value="es">Español</option>
+                <option value="en">Inglés</option>
+                <option value="fr">Francés</option>
+                <option value="de">Alemán</option>
+                <option value="it">Italiano</option>
+                <option value="pt">Portugués</option>
+              </select>
+            </label>
+            <label class="setting-field">
+              <span>Radio por defecto</span>
+              <select id="radius-setting">
+                <option value="all">Sin límite</option>
+                <option value="1">1 km</option>
+                <option value="3">3 km</option>
+                <option value="5">5 km</option>
+              </select>
+            </label>
+            <label class="setting-field">
+              <span>Presupuesto habitual</span>
+              <select id="budget-setting">
+                <option value="any">Cualquiera</option>
+                <option value="cheap">Económico</option>
+                <option value="medium">Medio</option>
+                <option value="premium">Premium</option>
+              </select>
+            </label>
+            <label class="setting-field">
+              <span>Modo Google Maps</span>
+              <select id="maps-mode-setting">
+                <option value="new-tab">Nueva pestaña</option>
+                <option value="same-tab">Dentro de la app</option>
+                <option value="external-app">App externa</option>
+              </select>
+            </label>
+          </div>
+
+          <section class="settings-section" aria-labelledby="food-preferences-title">
+            <h3 id="food-preferences-title">Preferencias de comida</h3>
+            <div class="preference-grid">
+              <label><input type="checkbox" name="food-preference" value="vegano" /> Vegano</label>
+              <label><input type="checkbox" name="food-preference" value="sin gluten" /> Sin gluten</label>
+              <label><input type="checkbox" name="food-preference" value="halal" /> Halal</label>
+              <label><input type="checkbox" name="food-preference" value="saludable" /> Saludable</label>
+              <label><input type="checkbox" name="food-preference" value="barato" /> Barato</label>
+              <label><input type="checkbox" name="food-preference" value="rápido" /> Rápido</label>
+            </div>
+            <button id="apply-preferences" class="secondary-action" type="button">Aplicar preferencias</button>
+          </section>
+
+          <label class="setting-row">
+            <span>Abrir Google Maps en una pestaña nueva</span>
+            <input id="handoff-setting" type="checkbox" checked />
+          </label>
+
+          <section class="settings-section" aria-labelledby="connection-title">
+            <h3 id="connection-title">Estado de conexión</h3>
+            <div id="connection-status" class="status-panel"></div>
+          </section>
+
+          <section class="settings-section" aria-labelledby="privacy-title">
+            <h3 id="privacy-title">Privacidad y datos</h3>
+            <p>La app guarda ubicación, favoritos, preferencias y búsquedas en este dispositivo. Puedes borrar esos datos cuando quieras.</p>
+            <button id="clear-data-button" class="danger-action" type="button">Borrar datos locales</button>
+          </section>
+
+          <label class="setting-row">
+            <span>Modo desarrollador</span>
+            <input id="developer-mode-setting" type="checkbox" />
+          </label>
+
+          <section id="developer-panel" class="settings-section developer-panel" aria-labelledby="developer-title" hidden>
+            <h3 id="developer-title">Diagnóstico</h3>
+            <dl>
+              <div><dt>Versión</dt><dd id="debug-version"></dd></div>
+              <div><dt>Endpoint</dt><dd id="debug-endpoint"></dd></div>
+              <div><dt>Radio</dt><dd id="debug-radius"></dd></div>
+              <div><dt>Resultados</dt><dd id="debug-results"></dd></div>
+              <div><dt>Estado</dt><dd id="debug-provider"></dd></div>
+            </dl>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="detail-dialog" class="detail-dialog">
+      <button id="detail-close" class="detail-close" type="button" aria-label="Cerrar detalle">×</button>
+      <div id="detail-content"></div>
+    </dialog>
+
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <button type="button" data-nav-view="map">▱<span>Mapa</span></button>
+      <button class="is-active" type="button" data-nav-view="explore">⌕<span>Explorar</span></button>
+      <button type="button" data-nav-view="favorites">♡<span>Favoritos</span></button>
+      <button type="button" data-nav-view="profile">♙<span>Perfil</span></button>
+    </nav>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
