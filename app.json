@@ -6,9 +6,10 @@
     "orientation": "portrait",
     "scheme": "savvyfoodie",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#E8750A"
       },
       "package": "com.caroldenissetorres.savvyfoodie"
@@ -17,7 +18,16 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "SavvyFoodie necesita tu ubicación para mostrarte restaurantes cercanos."
+          "locationWhenInUsePermission": "SavvyFoodie necesita tu ubicación para mostrarte restaurantes cercanos."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#1A1A1A"
         }
       ]
     ],

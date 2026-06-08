@@ -2,7 +2,6 @@
   "name": "savvyfoodie",
   "version": "0.2.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "android": "expo start --android",
     "build": "vite build",
@@ -16,7 +15,7 @@
   "devDependencies": {
     "@types/react": "~19.2.14",
     "@vitejs/plugin-basic-ssl": "^2.1.0",
-    "typescript": "^5.9.3",
+    "typescript": "~6.0.3",
     "vite": "^7.2.4"
   },
   "dependencies": {
@@ -24,6 +23,7 @@
     "expo": "^56.0.8",
     "expo-dev-client": "~56.0.18",
     "expo-location": "~56.0.15",
+    "expo-splash-screen": "~56.0.10",
     "react": "19.2.3",
     "react-native": "0.85.3",
     "react-native-safe-area-context": "~5.7.0",

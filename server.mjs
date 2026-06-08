@@ -112,6 +112,7 @@ const FIELD_MASK = [
   "places.rating",
   "places.userRatingCount",
   "places.priceLevel",
+  "places.priceRange",
   "places.regularOpeningHours",
   "places.internationalPhoneNumber",
   "places.websiteUri",
@@ -142,8 +143,9 @@ async function doGoogleFetch(query, latSnapped, lonSnapped, radiusMeters, maxRes
     : {
         textQuery: `${query} restaurante`,
         maxResultCount,
-        // ── Opt-13: locationRestriction en lugar de locationBias ────────────
-        locationRestriction: {
+        // searchText solo acepta "circle" bajo locationBias (locationRestriction
+        // exige un rectángulo). Usamos locationBias.circle para acotar por radio.
+        locationBias: {
           circle: { center: { latitude: latSnapped, longitude: lonSnapped }, radius: radiusMeters },
         },
         includedType: "restaurant",
@@ -385,8 +387,8 @@ createServer((request, response) => {
   }
 
   serveStatic(request, response);
-}).listen(port, "127.0.0.1", () => {
-  logger.info("server_started", { url: `http://127.0.0.1:${port}`, config });
+}).listen(port, "0.0.0.0", () => {
+  logger.info("server_started", { url: `http://0.0.0.0:${port}`, config });
 
   // ── Optimización 14: cache warming al arrancar ───────────────────────────
   // Pre-pobla la caché para la ubicación por defecto con búsqueda vacía (Nearby Search).

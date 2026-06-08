@@ -3,11 +3,7 @@
     "target": "ES2022",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "allowJs": false,
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
@@ -16,10 +12,9 @@
     "noEmit": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true
+    "noImplicitOverride": true,
+    "jsx": "react-native"
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src", "App.tsx"],
   "extends": "expo/tsconfig.base"
 }

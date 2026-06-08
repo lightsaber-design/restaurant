@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { StatusBar, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import TabBar from "./src/components/TabBar";
@@ -7,6 +7,7 @@ import FavoritesScreen from "./src/screens/FavoritesScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import { useAppState } from "./src/hooks/useAppState";
 import { initStore } from "./src/state/store";
+import { theme } from "./src/theme";
 
 function RootApp() {
   const appState = useAppState();
@@ -18,10 +19,10 @@ function RootApp() {
   const view = appState.view;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F5F5F5" }}>
-      <StatusBar barStyle="light-content" backgroundColor="#1A1A1A" />
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      <StatusBar barStyle="light-content" backgroundColor={theme.bg} />
       <View style={{ flex: 1 }}>
-        {(view === "explore" || view === "map") && <ExploreScreen />}
+        {view === "explore" && <ExploreScreen />}
         {view === "favorites" && <FavoritesScreen />}
         {view === "profile" && <ProfileScreen />}
       </View>

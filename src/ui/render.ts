@@ -132,7 +132,7 @@ export function renderResults(): void {
     return;
   }
 
-  const results = getFilteredResults(dom.dishInput.value, dom.priceFilter.value, dom.distanceFilter.value);
+  const results = getFilteredResults(dom.dishInput.value);
   if (results.length === 0) {
     renderNoResults();
     return;

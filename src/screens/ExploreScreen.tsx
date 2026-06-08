@@ -1,56 +1,181 @@
-import * as Location from "expo-location";
-import React, { useCallback, useRef, useState } from "react";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let WebView: any = null;
+try { WebView = require("react-native-webview").WebView; } catch {}
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
-  Linking,
-  Modal,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import RestaurantCard from "../components/RestaurantCard";
 import { useAppState } from "../hooks/useAppState";
-import { fetchLocationSuggestions, getShortLocationName } from "../providers/geocodingProvider";
 import { fetchNearbyRestaurants, getProviderErrorMessage } from "../providers/placesProvider";
 import {
   addRecentSearch,
   addSmartHistory,
-  setCurrentLocation,
+  clearPendingSearch,
   setProviderError,
   setRestaurants,
-  setSortMode,
+  setSelectedRestaurant,
+  setView,
   updateSettings,
 } from "../state/store";
 import { getFilteredResults } from "../selectors";
-import type { GeocodingPlace } from "../types";
+import { CATEGORIES, MORE_CATEGORIES, theme } from "../theme";
+import { normalizeText } from "../utils/format";
+import type { Restaurant } from "../types";
 
-const SORT_LABELS: Record<string, string> = { best: "Mejor", nearest: "Más cercano", favorites: "Favoritos" };
-const PRICE_OPTIONS = [
-  { label: "Todos", value: "all" },
-  { label: "€", value: "10" },
-  { label: "€€", value: "15" },
-  { label: "€€€", value: "20" },
-] as const;
+const PRICE_CYCLE: Array<{ label: string; value: "all" | "10" | "15" | "20" }> = [
+  { label: "Cualquier precio", value: "all" },
+  { label: "< €10", value: "10" },
+  { label: "< €15", value: "15" },
+  { label: "< €20", value: "20" },
+];
+const DISTANCE_CYCLE: Array<{ label: string; value: "all" | "1" | "3" | "5" }> = [
+  { label: "Cualquier distancia", value: "all" },
+  { label: "1 km", value: "1" },
+  { label: "3 km", value: "3" },
+  { label: "5 km", value: "5" },
+];
+const SORT_CYCLE: Array<{ label: string; value: "best" | "nearest" | "favorites" }> = [
+  { label: "Mejor resultado", value: "best" },
+  { label: "Más cercanos", value: "nearest" },
+  { label: "Favoritos primero", value: "favorites" },
+];
 
-type PriceValue = "all" | "10" | "15" | "20";
+const ALL_CAT_DISHES = [...CATEGORIES.map((c) => c.dish), ...MORE_CATEGORIES];
+
+function buildLeafletHtml(
+  center: { latitude: number; longitude: number },
+  places: Restaurant[],
+  selectedId: string | null,
+): string {
+  const markers = places.map((p) => ({
+    id: p.id,
+    lat: p.latitude,
+    lng: p.longitude,
+    name: p.name.replace(/'/g, "\\'").replace(/"/g, "&quot;"),
+    selected: p.id === selectedId,
+  }));
+  return `<!doctype html><html><head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html,body,#map{height:100%;margin:0;background:#191a21;}
+  .leaflet-popup-content{font-family:sans-serif;font-weight:700;}
+</style>
+</head><body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  var center=[${center.latitude},${center.longitude}];
+  var map=L.map('map',{zoomControl:true}).setView(center, ${places.length ? 14 : 12});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19, attribution:'© OpenStreetMap'
+  }).addTo(map);
+  var markers=${JSON.stringify(markers)};
+  var group=[];
+  markers.forEach(function(m){
+    var icon=L.divIcon({
+      html:'<div style="background:'+(m.selected?'#a985ff':'#7f5af0')+';width:'+(m.selected?22:16)+'px;height:'+(m.selected?22:16)+'px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.5);"></div>',
+      className:'', iconSize:[22,22], iconAnchor:[11,11]
+    });
+    var mk=L.marker([m.lat,m.lng],{icon:icon}).addTo(map);
+    mk.bindPopup('<b>'+m.name+'</b>');
+    mk.on('click',function(){
+      if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(m.id);}
+    });
+    group.push([m.lat,m.lng]);
+  });
+  if(group.length>1){ map.fitBounds(group,{padding:[40,40]}); }
+</script>
+</body></html>`;
+}
+
+// ── Barra de filtros rápidos ─────────────────────────────────────────────────
+
+function QuickFilterBar() {
+  const appState = useAppState();
+  const s = appState.settings;
+
+  function cyclePrice() {
+    const idx = PRICE_CYCLE.findIndex((o) => o.value === s.maxPrice);
+    const next = PRICE_CYCLE[(idx + 1) % PRICE_CYCLE.length]!;
+    updateSettings({ maxPrice: next.value });
+  }
+  function cycleDistance() {
+    const idx = DISTANCE_CYCLE.findIndex((o) => o.value === s.defaultRadiusKm);
+    const next = DISTANCE_CYCLE[(idx + 1) % DISTANCE_CYCLE.length]!;
+    updateSettings({ defaultRadiusKm: next.value });
+  }
+  function cycleSort() {
+    const idx = SORT_CYCLE.findIndex((o) => o.value === s.sortMode);
+    const next = SORT_CYCLE[(idx + 1) % SORT_CYCLE.length]!;
+    updateSettings({ sortMode: next.value });
+  }
+
+  const priceLabel = PRICE_CYCLE.find((o) => o.value === s.maxPrice)?.label ?? "Precio";
+  const distLabel = DISTANCE_CYCLE.find((o) => o.value === s.defaultRadiusKm)?.label ?? "Distancia";
+  const sortLabel = SORT_CYCLE.find((o) => o.value === s.sortMode)?.label ?? "Orden";
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.qfScroll}
+      contentContainerStyle={styles.qfRow}
+    >
+      {/* Abierto ahora */}
+      <TouchableOpacity
+        style={[styles.qfChip, s.openNow && styles.qfChipOn]}
+        onPress={() => updateSettings({ openNow: !s.openNow })}
+      >
+        <Text style={styles.qfDot}>{s.openNow ? "🟢" : "⚫"}</Text>
+        <Text style={[styles.qfText, s.openNow && styles.qfTextOn]}>
+          {s.openNow ? "Abiertos" : "Todos"}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Radio */}
+      <TouchableOpacity style={[styles.qfChip, s.defaultRadiusKm !== "all" && styles.qfChipOn]} onPress={cycleDistance}>
+        <Text style={styles.qfIcon}>📍</Text>
+        <Text style={[styles.qfText, s.defaultRadiusKm !== "all" && styles.qfTextOn]}>{distLabel}</Text>
+        <Text style={styles.qfArrow}>›</Text>
+      </TouchableOpacity>
+
+      {/* Precio */}
+      <TouchableOpacity style={[styles.qfChip, s.maxPrice !== "all" && styles.qfChipOn]} onPress={cyclePrice}>
+        <Text style={styles.qfIcon}>💰</Text>
+        <Text style={[styles.qfText, s.maxPrice !== "all" && styles.qfTextOn]}>{priceLabel}</Text>
+        <Text style={styles.qfArrow}>›</Text>
+      </TouchableOpacity>
+
+      {/* Orden */}
+      <TouchableOpacity style={[styles.qfChip, s.sortMode !== "best" && styles.qfChipOn]} onPress={cycleSort}>
+        <Text style={styles.qfIcon}>↕</Text>
+        <Text style={[styles.qfText, s.sortMode !== "best" && styles.qfTextOn]}>{sortLabel}</Text>
+        <Text style={styles.qfArrow}>›</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+// ── Pantalla principal ────────────────────────────────────────────────────────
 
 export default function ExploreScreen() {
   const appState = useAppState();
   const insets = useSafeAreaInsets();
   const [dishText, setDishText] = useState("");
-  const [priceFilter, setPriceFilter] = useState<PriceValue>("all");
   const [loading, setLoading] = useState(false);
   const [mapMode, setMapMode] = useState(false);
-  const [locationModalOpen, setLocationModalOpen] = useState(false);
-  const [locationQuery, setLocationQuery] = useState("");
-  const [locationSuggestions, setLocationSuggestions] = useState<GeocodingPlace[]>([]);
-  const [locationSearching, setLocationSearching] = useState(false);
-  const locationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [suggestOpen, setSuggestOpen] = useState(false);
 
   const search = useCallback(
     async (query: string) => {
@@ -68,285 +193,347 @@ export default function ExploreScreen() {
     [appState.currentLocation, appState.settings.defaultRadiusKm],
   );
 
-  function handleSearch() {
-    const q = dishText.trim();
+  function searchDish(dish: string) {
+    const q = dish.trim();
+    if (!q) return;
+    setDishText(q);
+    setSuggestOpen(false);
+    setSelectedRestaurant(null);
     addRecentSearch(q);
     addSmartHistory(q);
     void search(q);
   }
 
-  async function requestGPS() {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") return;
-    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    setCurrentLocation("Tu ubicación", pos.coords.latitude, pos.coords.longitude);
-    void search(dishText.trim());
-  }
+  // Auto-búsqueda cuando viene desde Favoritos (categoría guardada)
+  useEffect(() => {
+    if (!appState.pendingSearch) return;
+    const q = appState.pendingSearch;
+    clearPendingSearch();
+    setDishText(q);
+    setSuggestOpen(false);
+    addRecentSearch(q);
+    addSmartHistory(q);
+    void search(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appState.pendingSearch]);
 
-  function handleLocationInput(text: string) {
-    setLocationQuery(text);
-    if (locationTimer.current) clearTimeout(locationTimer.current);
-    if (text.trim().length < 3) { setLocationSuggestions([]); return; }
-    locationTimer.current = setTimeout(async () => {
-      setLocationSearching(true);
-      try { setLocationSuggestions(await fetchLocationSuggestions(text)); }
-      catch { setLocationSuggestions([]); }
-      finally { setLocationSearching(false); }
-    }, 700);
-  }
+  const suggestions = useMemo(() => {
+    if (dishText.length < 3) return null;
+    const q = normalizeText(dishText);
+    const saved = appState.savedCategories.filter((c) => normalizeText(c).includes(q));
+    const unsaved = ALL_CAT_DISHES.filter(
+      (c) => normalizeText(c).includes(q) && !appState.savedCategories.includes(c),
+    );
+    return { saved, unsaved };
+  }, [dishText, appState.savedCategories]);
 
-  function selectLocation(place: GeocodingPlace) {
-    setCurrentLocation(getShortLocationName(place), Number(place.lat), Number(place.lon));
-    setLocationModalOpen(false);
-    setLocationQuery("");
-    setLocationSuggestions([]);
-    void search(dishText.trim());
-  }
+  const showSuggestions = suggestOpen && suggestions !== null;
 
-  const results = getFilteredResults(dishText, priceFilter, appState.settings.defaultRadiusKm);
-  const mapQuery = encodeURIComponent(`${dishText || "restaurante"} cerca de ${appState.currentLocation.label}`);
-  const mapUrl = `https://www.google.com/maps?q=${mapQuery}&output=embed`;
+  const results = getFilteredResults(dishText);
   const hasError = appState.providerErrorMessage !== "";
+  const hasSearched = appState.activeRestaurants.length > 0 || hasError || loading;
+
+  const mapResults = getFilteredResults("");
+  const mapSelected = mapResults.find((r) => r.id === appState.selectedRestaurantId) || mapResults[0] || null;
+  const mapHtml = useMemo(
+    () => buildLeafletHtml(appState.currentLocation, mapResults, mapSelected?.id ?? null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [appState.currentLocation.latitude, appState.currentLocation.longitude, mapResults.length, mapSelected?.id],
+  );
+
+  function getCatEmoji(dish: string): string | null {
+    return CATEGORIES.find((c) => c.dish === dish)?.emoji ?? null;
+  }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>🍽 SavvyFoodie</Text>
-        <TouchableOpacity style={styles.locationBtn} onPress={() => setLocationModalOpen(true)}>
-          <Text style={styles.locationLabel} numberOfLines={1}>📍 {appState.currentLocation.label}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.gpsBtn} onPress={requestGPS}>
-          <Text style={styles.gpsBtnText}>GPS</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Search bar */}
-      <View style={styles.searchRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="¿Qué quieres comer?"
-          placeholderTextColor="#aaa"
-          value={dishText}
-          onChangeText={setDishText}
-          onSubmitEditing={handleSearch}
-          returnKeyType="search"
-        />
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearch} activeOpacity={0.8}>
-          <Text style={styles.searchBtnText}>Buscar</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Filters row */}
-      <View style={styles.filtersScroll}>
-        {/* Sort */}
-        {(["best", "nearest", "favorites"] as const).map((mode) => (
-          <TouchableOpacity
-            key={mode}
-            style={[styles.chip, appState.settings.sortMode === mode && styles.chipActive]}
-            onPress={() => setSortMode(mode)}
-          >
-            <Text style={[styles.chipText, appState.settings.sortMode === mode && styles.chipTextActive]}>
-              {SORT_LABELS[mode]}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        {/* Radius */}
-        {(["all", "1", "3", "5"] as const).map((r) => (
-          <TouchableOpacity
-            key={r}
-            style={[styles.chip, appState.settings.defaultRadiusKm === r && styles.chipActive]}
-            onPress={() => updateSettings({ defaultRadiusKm: r })}
-          >
-            <Text style={[styles.chipText, appState.settings.defaultRadiusKm === r && styles.chipTextActive]}>
-              {r === "all" ? "Todos" : `${r} km`}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        {/* Price */}
-        {PRICE_OPTIONS.map((opt) => (
-          <TouchableOpacity
-            key={opt.value}
-            style={[styles.chip, priceFilter === opt.value && styles.chipActive]}
-            onPress={() => setPriceFilter(opt.value)}
-          >
-            <Text style={[styles.chipText, priceFilter === opt.value && styles.chipTextActive]}>{opt.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* View toggle + result count */}
-      {appState.activeRestaurants.length > 0 && (
-        <View style={styles.toolbar}>
-          <Text style={styles.resultCount}>{results.length} {results.length === 1 ? "lugar" : "lugares"}</Text>
-          <View style={styles.viewToggle}>
-            <TouchableOpacity
-              style={[styles.toggleBtn, !mapMode && styles.toggleBtnActive]}
-              onPress={() => setMapMode(false)}
-            >
-              <Text style={[styles.toggleBtnText, !mapMode && styles.toggleBtnTextActive]}>Lista</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleBtn, mapMode && styles.toggleBtnActive]}
-              onPress={() => setMapMode(true)}
-            >
-              <Text style={[styles.toggleBtnText, mapMode && styles.toggleBtnTextActive]}>Mapa</Text>
+    <View style={styles.screen}>
+      {/* Top bar */}
+      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.brand}>
+          <Text style={styles.brandMark}>🍴</Text>
+          <View style={styles.brandText}>
+            <Text style={styles.brandTitle}>SavvyFoodie</Text>
+            <TouchableOpacity onPress={() => setView("profile")}>
+              <Text style={styles.locationChip} numberOfLines={1}>{appState.currentLocation.label}</Text>
             </TouchableOpacity>
           </View>
         </View>
-      )}
 
-      {/* Loading */}
-      {loading && (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#E8750A" />
-          <Text style={styles.loadingText}>Buscando restaurantes…</Text>
-        </View>
-      )}
-
-      {/* Error */}
-      {!loading && hasError && (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{appState.providerErrorMessage}</Text>
+        {/* Lista / Mapa toggle */}
+        <View style={styles.viewToggle}>
           <TouchableOpacity
-            style={styles.mapsLink}
-            onPress={() => void Linking.openURL(`https://www.google.com/maps/search/${mapQuery}`)}
+            style={[styles.toggleBtn, !mapMode && styles.toggleBtnActive]}
+            onPress={() => setMapMode(false)}
           >
-            <Text style={styles.mapsLinkText}>Abrir Google Maps →</Text>
+            <Text style={[styles.toggleBtnText, !mapMode && styles.toggleBtnTextActive]}>Lista</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, mapMode && styles.toggleBtnActive]}
+            onPress={() => setMapMode(true)}
+          >
+            <Text style={[styles.toggleBtnText, mapMode && styles.toggleBtnTextActive]}>Mapa</Text>
           </TouchableOpacity>
         </View>
-      )}
+      </View>
 
-      {/* Map view */}
-      {!loading && !hasError && mapMode && appState.activeRestaurants.length > 0 && (
-        <WebView source={{ uri: mapUrl }} style={styles.map} />
-      )}
+      {/* Search box */}
+      <View style={styles.searchWrap}>
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Busca tu antojo (ej. hamburguesas)"
+            placeholderTextColor={theme.muted2}
+            value={dishText}
+            onChangeText={(v) => {
+              setDishText(v);
+              setSuggestOpen(v.length >= 3);
+            }}
+            onSubmitEditing={() => searchDish(dishText)}
+            returnKeyType="search"
+          />
+          {dishText.length > 0 && (
+            <TouchableOpacity onPress={() => { setDishText(""); setSuggestOpen(false); }} hitSlop={10}>
+              <Text style={styles.clearBtn}>×</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
 
-      {/* List view */}
-      {!loading && !hasError && !mapMode && (
-        appState.activeRestaurants.length === 0 ? (
-          <View style={styles.recent}>
-            <Text style={styles.recentTitle}>Búsquedas recientes</Text>
-            <View style={styles.recentRow}>
-              {appState.recentSearches.map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={styles.recentChip}
-                  onPress={() => { setDishText(s); addRecentSearch(s); void search(s); }}
-                >
-                  <Text style={styles.recentChipText}>{s}</Text>
+      {/* Content */}
+      {showSuggestions ? (
+        /* ── Sugerencias ── */
+        <ScrollView
+          style={styles.suggestScroll}
+          contentContainerStyle={styles.suggestContent}
+          keyboardShouldPersistTaps="always"
+        >
+          {suggestions!.saved.length > 0 && (
+            <>
+              <Text style={styles.suggestSection}>Mis categorías</Text>
+              {suggestions!.saved.map((cat) => (
+                <TouchableOpacity key={cat} style={styles.suggestRow} onPress={() => searchDish(cat)}>
+                  <Text style={styles.suggestStar}>★</Text>
+                  <Text style={styles.suggestLabel}>
+                    {getCatEmoji(cat) ? `${getCatEmoji(cat)} ` : ""}{cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
                 </TouchableOpacity>
               ))}
-            </View>
-            {appState.settings.foodPreferences.length > 0 && (
-              <TouchableOpacity
-                style={styles.prefBtn}
-                onPress={() => {
-                  const q = appState.settings.foodPreferences.join(" ");
-                  setDishText(q);
-                  void search(q);
-                }}
-              >
-                <Text style={styles.prefBtnText}>🍴 Buscar mis preferencias</Text>
-              </TouchableOpacity>
+            </>
+          )}
+
+          {suggestions!.unsaved.length > 0 && (
+            <>
+              <Text style={styles.suggestSection}>Categorías</Text>
+              {suggestions!.unsaved.map((cat) => (
+                <TouchableOpacity key={cat} style={styles.suggestRow} onPress={() => searchDish(cat)}>
+                  <Text style={styles.suggestLabel}>
+                    {getCatEmoji(cat) ? `${getCatEmoji(cat)} ` : ""}{cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+
+          {/* Raw query */}
+          <TouchableOpacity style={styles.suggestRaw} onPress={() => searchDish(dishText)}>
+            <Text style={styles.searchIcon}>⌕</Text>
+            <Text style={styles.suggestRawText}>Buscar "{dishText}"</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      ) : mapMode ? (
+        /* ── Vista Mapa ── */
+        <ScrollView contentContainerStyle={styles.mapContent} showsVerticalScrollIndicator={false}>
+          <QuickFilterBar />
+          <View style={styles.mapFrame}>
+            {WebView ? (
+              <WebView
+                source={{ html: mapHtml }}
+                style={styles.webview}
+                originWhitelist={["*"]}
+                javaScriptEnabled
+                domStorageEnabled
+                onMessage={(e: { nativeEvent: { data: string } }) => setSelectedRestaurant(e.nativeEvent.data)}
+              />
+            ) : (
+              <View style={styles.mapFallback}>
+                <Text style={styles.mapFallbackIcon}>🗺</Text>
+                <Text style={styles.mapFallbackText}>Mapa no disponible en este build</Text>
+              </View>
             )}
           </View>
-        ) : (
-          results.length === 0 ? (
-            <View style={styles.centered}>
-              <Text style={styles.errorText}>No se encontraron resultados.</Text>
-              <TouchableOpacity
-                style={styles.mapsLink}
-                onPress={() => void Linking.openURL(`https://www.google.com/maps/search/${mapQuery}`)}
-              >
-                <Text style={styles.mapsLinkText}>Abrir en Google Maps →</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <FlatList
-              data={results}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <RestaurantCard restaurant={item} />}
-              contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
-            />
-          )
-        )
-      )}
 
-      {/* Location modal */}
-      <Modal visible={locationModalOpen} animationType="slide" transparent onRequestClose={() => setLocationModalOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Cambiar ubicación</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Escribe una ciudad o dirección…"
-              placeholderTextColor="#aaa"
-              value={locationQuery}
-              onChangeText={handleLocationInput}
-              autoFocus
-            />
-            {locationSearching && <ActivityIndicator color="#E8750A" style={{ marginVertical: 8 }} />}
-            {locationSuggestions.map((place, i) => (
-              <TouchableOpacity key={i} style={styles.suggestion} onPress={() => selectLocation(place)}>
-                <Text style={styles.suggestionText} numberOfLines={2}>{place.display_name}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setLocationModalOpen(false)}>
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
-            </TouchableOpacity>
+          {mapResults.length > 0 && (
+            <View style={styles.placeList}>
+              {mapResults.slice(0, 8).map((r, i) => {
+                const active = r.id === mapSelected?.id;
+                return (
+                  <TouchableOpacity
+                    key={r.id}
+                    style={[styles.placeItem, active && styles.placeItemActive]}
+                    onPress={() => setSelectedRestaurant(r.id)}
+                  >
+                    <Text style={styles.placeName} numberOfLines={1}>{i + 1}. {r.name}</Text>
+                    <Text style={styles.placeMeta}>A {(r.distanceKm ?? 0).toFixed(1)} km</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {mapResults.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Sin restaurantes en el mapa</Text>
+              <Text style={styles.emptyText}>Haz una búsqueda en la vista de lista para verlos aquí.</Text>
+            </View>
+          )}
+        </ScrollView>
+      ) : (
+        /* ── Vista Lista ── */
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <QuickFilterBar />
+
+          {/* Resultados */}
+          <View style={styles.block}>
+            <View style={styles.sectionHeading}>
+              {hasSearched && !loading && (
+                <View style={styles.resultCount}>
+                  <Text style={styles.resultCountText}>{results.length} {results.length === 1 ? "lugar" : "lugares"}</Text>
+                </View>
+              )}
+            </View>
+
+            {loading ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="large" color={theme.accent} />
+                <Text style={styles.loadingText}>Buscando restaurantes…</Text>
+              </View>
+            ) : hasError ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Google Places no está conectado</Text>
+                <Text style={styles.emptyText}>{appState.providerErrorMessage}</Text>
+              </View>
+            ) : results.length === 0 && appState.activeRestaurants.length > 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Sin resultados con estos filtros</Text>
+                <Text style={styles.emptyText}>Prueba con otra comida o cambia los filtros.</Text>
+              </View>
+            ) : appState.activeRestaurants.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Empieza una búsqueda</Text>
+                <Text style={styles.emptyText}>Elige una categoría o escribe tu antojo arriba.</Text>
+              </View>
+            ) : (
+              <View style={styles.resultsList}>
+                {results.map((r) => <RestaurantCard key={r.id} restaurant={r} />)}
+              </View>
+            )}
           </View>
-        </View>
-      </Modal>
+        </ScrollView>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  cancelBtn: { alignItems: "center", marginTop: 12, paddingVertical: 10 },
-  cancelBtnText: { color: "#888", fontSize: 15 },
-  centered: { alignItems: "center", flex: 1, justifyContent: "center", paddingHorizontal: 24 },
-  chip: { backgroundColor: "#F0F0F0", borderRadius: 20, marginBottom: 4, marginRight: 6, paddingHorizontal: 12, paddingVertical: 5 },
-  chipActive: { backgroundColor: "#E8750A" },
-  chipText: { color: "#555", fontSize: 12, fontWeight: "500" },
-  chipTextActive: { color: "#fff" },
-  errorText: { color: "#C00", fontSize: 15, textAlign: "center" },
-  filtersScroll: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, paddingVertical: 8 },
-  gpsBtn: { backgroundColor: "#E8750A", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  gpsBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  header: { alignItems: "center", backgroundColor: "#1A1A1A", flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
-  input: { backgroundColor: "#fff", borderColor: "#ddd", borderRadius: 10, borderWidth: 1, flex: 1, fontSize: 15, paddingHorizontal: 14, paddingVertical: 10 },
-  list: { paddingBottom: 20, paddingTop: 8 },
-  loadingText: { color: "#666", fontSize: 14, marginTop: 12 },
-  locationBtn: { flex: 1 },
-  locationLabel: { color: "#fff", fontSize: 13 },
-  map: { flex: 1 },
-  mapsLink: { marginTop: 12 },
-  mapsLinkText: { color: "#E8750A", fontSize: 14, fontWeight: "600" },
-  modalCard: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%", padding: 20, width: "100%" },
-  modalInput: { backgroundColor: "#F5F5F5", borderRadius: 10, fontSize: 15, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 10 },
-  modalOverlay: { backgroundColor: "rgba(0,0,0,0.4)", flex: 1, justifyContent: "flex-end" },
-  modalTitle: { fontSize: 18, fontWeight: "700", marginBottom: 14 },
-  prefBtn: { backgroundColor: "#FFF3E0", borderRadius: 10, marginTop: 12, paddingHorizontal: 16, paddingVertical: 10 },
-  prefBtnText: { color: "#E8750A", fontWeight: "600" },
-  recent: { padding: 16 },
-  recentChip: { backgroundColor: "#F5F5F5", borderRadius: 16, marginBottom: 6, marginRight: 8, paddingHorizontal: 14, paddingVertical: 7 },
-  recentChipText: { color: "#444", fontSize: 13 },
-  recentRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 8 },
-  recentTitle: { color: "#888", fontSize: 13, fontWeight: "600" },
-  resultCount: { color: "#666", fontSize: 13 },
-  screen: { backgroundColor: "#F5F5F5", flex: 1 },
-  searchBtn: { backgroundColor: "#E8750A", borderRadius: 10, marginLeft: 8, paddingHorizontal: 16, paddingVertical: 10 },
-  searchBtnText: { color: "#fff", fontWeight: "700" },
-  searchRow: { flexDirection: "row", paddingHorizontal: 16, paddingVertical: 10 },
-  suggestion: { borderTopColor: "#F0F0F0", borderTopWidth: 1, paddingVertical: 12 },
-  suggestionText: { color: "#333", fontSize: 14 },
-  title: { color: "#fff", fontSize: 18, fontWeight: "800", marginRight: 8 },
-  toggleBtn: { paddingHorizontal: 14, paddingVertical: 5 },
-  toggleBtnActive: { backgroundColor: "#E8750A", borderRadius: 8 },
-  toggleBtnText: { color: "#666", fontSize: 13, fontWeight: "600" },
-  toggleBtnTextActive: { color: "#fff" },
-  toolbar: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 6 },
-  viewToggle: { backgroundColor: "#F0F0F0", borderRadius: 10, flexDirection: "row", padding: 2 },
+  block: { marginBottom: 28 },
+  brand: { alignItems: "center", flexDirection: "row", flex: 1, gap: 12, minWidth: 0 },
+  brandMark: { color: theme.accent, fontSize: 30 },
+  brandText: { flex: 1, minWidth: 0 },
+  brandTitle: { color: theme.text, fontSize: 26, fontWeight: "900" },
+  clearBtn: { color: theme.muted2, fontSize: 24, fontWeight: "700", paddingHorizontal: 6 },
+  content: { paddingBottom: 120, paddingHorizontal: 16, paddingTop: 8 },
+  emptyState: { backgroundColor: theme.panel, borderColor: theme.line, borderRadius: 20, borderStyle: "dashed", borderWidth: 1, padding: 22 },
+  emptyText: { color: theme.muted, fontSize: 14, lineHeight: 21, marginTop: 6 },
+  emptyTitle: { color: theme.text, fontSize: 18, fontWeight: "800" },
+  loadingBox: { alignItems: "center", paddingVertical: 40 },
+  loadingText: { color: theme.muted, fontSize: 14, marginTop: 12 },
+  locationChip: { color: theme.muted, fontSize: 13, fontWeight: "800", marginTop: 2 },
+  // Quick filter bar
+  qfArrow: { color: theme.muted2, fontSize: 16, fontWeight: "700" },
+  qfChip: {
+    alignItems: "center",
+    backgroundColor: theme.panel2,
+    borderColor: theme.line,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  qfChipOn: { backgroundColor: theme.accentChipBg, borderColor: "rgba(169,133,255,0.5)" },
+  qfDot: { fontSize: 11 },
+  qfIcon: { fontSize: 13 },
+  qfRow: { alignItems: "center", flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  qfScroll: { borderBottomColor: theme.line, borderBottomWidth: 1 },
+  qfText: { color: theme.muted, fontSize: 12.5, fontWeight: "700" },
+  qfTextOn: { color: theme.accentChipText },
+  mapContent: { paddingBottom: 120, paddingHorizontal: 16, paddingTop: 16 },
+  mapFallback: { alignItems: "center", flex: 1, justifyContent: "center", padding: 24 },
+  mapFallbackIcon: { fontSize: 48, marginBottom: 12 },
+  mapFallbackText: { color: theme.accent, fontSize: 16, fontWeight: "900" },
+  mapFrame: { aspectRatio: 3 / 4, backgroundColor: theme.panel2, borderColor: theme.line, borderRadius: 20, borderWidth: 1, minHeight: 360, overflow: "hidden" },
+  placeItem: { backgroundColor: theme.panel2, borderColor: theme.line, borderRadius: 16, borderWidth: 1, padding: 12 },
+  placeItemActive: { borderColor: theme.accent },
+  placeList: { gap: 10, marginTop: 14 },
+  placeMeta: { color: theme.muted, fontSize: 13, marginTop: 4 },
+  placeName: { color: theme.text, fontSize: 15, fontWeight: "700" },
+  resultCount: { backgroundColor: theme.accentChipBg, borderRadius: 999, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 8, alignSelf: "flex-start" },
+  resultCountText: { color: theme.accentChipText, fontSize: 13, fontWeight: "900" },
+  resultsList: { gap: 14 },
+  screen: { backgroundColor: theme.bg, flex: 1 },
+  searchBox: {
+    alignItems: "center",
+    backgroundColor: theme.searchBg,
+    borderColor: theme.line,
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 60,
+    paddingHorizontal: 16,
+  },
+  searchIcon: { color: theme.muted, fontSize: 28 },
+  searchInput: { color: theme.text, flex: 1, fontSize: 16, fontWeight: "700" },
+  searchWrap: { paddingHorizontal: 16, paddingVertical: 12 },
+  sectionHeading: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
+  suggestContent: { paddingBottom: 80 },
+  suggestLabel: { color: theme.text, flex: 1, fontSize: 15, fontWeight: "700" },
+  suggestRaw: {
+    alignItems: "center",
+    borderTopColor: theme.line,
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  suggestRawText: { color: theme.muted, fontSize: 15, fontStyle: "italic" },
+  suggestRow: { alignItems: "center", flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
+  suggestScroll: { flex: 1 },
+  suggestSection: { color: theme.muted, fontSize: 12, fontWeight: "900", letterSpacing: 1, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, textTransform: "uppercase" },
+  suggestStar: { color: theme.accent, fontSize: 16 },
+  toggleBtn: { borderColor: theme.line, borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7 },
+  toggleBtnActive: { backgroundColor: theme.accent, borderColor: theme.accent },
+  toggleBtnText: { color: theme.muted, fontSize: 13, fontWeight: "800" },
+  toggleBtnTextActive: { color: "#111015" },
+  topBar: {
+    alignItems: "center",
+    backgroundColor: "rgba(8, 9, 13, 0.98)",
+    borderBottomColor: theme.line,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+  },
+  viewToggle: { flexDirection: "row", gap: 6 },
+  webview: { backgroundColor: theme.panel2, flex: 1 },
 });

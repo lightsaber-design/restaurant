@@ -26,6 +26,7 @@ export const appConfig = {
     history: "savvyfoodie:history",
     lastLocation: "savvyfoodie:last-location",
     recentSearches: "savvyfoodie:recent-searches",
+    savedCategories: "savvyfoodie:saved-categories",
     settings: "savvyfoodie:settings",
   },
   ui: {

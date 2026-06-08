@@ -14,7 +14,9 @@ const defaultSettings: AppState["settings"] = {
   foodPreferences: [],
   language: "es",
   mapsMode: "new-tab",
+  maxPrice: "all",
   openMapsInNewTab: true,
+  openNow: true,
   sortMode: "best",
 };
 
@@ -22,23 +24,27 @@ export const state: AppState = {
   activeRestaurants: [],
   currentLocation: { ...appConfig.location.defaultPoint },
   favorites: [],
+  pendingSearch: null,
   providerErrorMessage: "",
   recentSearches: ["Ramen tonkotsu", "Tacos al pastor", "Café helado"],
+  savedCategories: [],
   selectedRestaurantId: null,
   settings: { ...defaultSettings },
   view: appConfig.ui.defaultView,
 };
 
 export async function initStore(): Promise<void> {
-  const [location, favorites, storedSearches, settings] = await Promise.all([
+  const [location, favorites, storedSearches, savedCategories, settings] = await Promise.all([
     loadStoredObject(appConfig.storageKeys.lastLocation, { ...appConfig.location.defaultPoint }),
     loadStoredArray<FavoriteRestaurant>(appConfig.storageKeys.favorites),
     loadStoredArray<string>(appConfig.storageKeys.recentSearches),
+    loadStoredArray<string>(appConfig.storageKeys.savedCategories),
     loadStoredObject(appConfig.storageKeys.settings, { ...defaultSettings }),
   ]);
   state.currentLocation = location;
   state.favorites = favorites;
   state.recentSearches = storedSearches.length ? storedSearches : ["Ramen tonkotsu", "Tacos al pastor", "Café helado"];
+  state.savedCategories = savedCategories;
   state.settings = settings;
   notify();
 }
@@ -84,6 +90,31 @@ export function addRecentSearch(dish: string): void {
     ...state.recentSearches.filter((item) => normalizeText(item) !== normalizeText(cleanDish)),
   ].slice(0, 5);
   void saveStoredValue(appConfig.storageKeys.recentSearches, state.recentSearches);
+  notify();
+}
+
+export function triggerSearch(dish: string): void {
+  state.pendingSearch = dish.trim();
+  state.view = "explore";
+  notify();
+}
+
+export function clearPendingSearch(): void {
+  state.pendingSearch = null;
+  notify();
+}
+
+export function saveCategory(dish: string): void {
+  const clean = dish.trim();
+  if (!clean || state.savedCategories.includes(clean)) return;
+  state.savedCategories = [clean, ...state.savedCategories];
+  void saveStoredValue(appConfig.storageKeys.savedCategories, state.savedCategories);
+  notify();
+}
+
+export function removeCategory(dish: string): void {
+  state.savedCategories = state.savedCategories.filter((c) => c !== dish);
+  void saveStoredValue(appConfig.storageKeys.savedCategories, state.savedCategories);
   notify();
 }
 

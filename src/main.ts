@@ -323,7 +323,7 @@ document.addEventListener("click", (event) => {
   const navButton = target.closest<HTMLButtonElement>("[data-nav-view]");
   if (navButton?.dataset.navView) {
     const view = navButton.dataset.navView;
-    if (view === "explore" || view === "map" || view === "favorites" || view === "profile") setView(view);
+    if (view === "explore" || view === "favorites" || view === "profile") setView(view);
     return;
   }
 
@@ -345,7 +345,7 @@ dom.resultsList.addEventListener("click", (event) => {
 
   if (selectButton?.dataset.select) {
     setSelectedRestaurant(selectButton.dataset.select);
-    setView("map");
+    setView("explore");
     return;
   }
   if (detailButton?.dataset.detail) {

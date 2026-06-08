@@ -2,27 +2,29 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { setView } from "../state/store";
+import { theme } from "../theme";
 import type { ViewName } from "../types";
 
 type Tab = { id: ViewName; label: string; icon: string };
 
+// Orden y símbolos igual que .bottom-nav del index.html
 const TABS: Tab[] = [
-  { id: "explore", label: "Explorar", icon: "🔍" },
-  { id: "favorites", label: "Favoritos", icon: "❤️" },
-  { id: "profile", label: "Ajustes", icon: "⚙️" },
+  { id: "explore", label: "Inicio", icon: "⌂" },
+  { id: "favorites", label: "Favoritos", icon: "♡" },
+  { id: "profile", label: "Perfil", icon: "♟" },
 ];
 
 export default function TabBar({ activeView }: { activeView: ViewName }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom || 8 }]}>
+    <View style={[styles.container, { paddingBottom: Math.max(10, insets.bottom) }]}>
       {TABS.map((tab) => {
-        const active = tab.id === activeView || (activeView === "map" && tab.id === "explore");
+        const active = tab.id === activeView;
         return (
           <TouchableOpacity key={tab.id} style={styles.tab} onPress={() => setView(tab.id)} activeOpacity={0.7}>
-            <Text style={styles.icon}>{tab.icon}</Text>
-            <Text style={[styles.label, active && styles.labelActive]}>{tab.label}</Text>
+            <Text style={[styles.icon, active && styles.active]}>{tab.icon}</Text>
+            <Text style={[styles.label, active && styles.active]}>{tab.label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -31,27 +33,15 @@ export default function TabBar({ activeView }: { activeView: ViewName }) {
 }
 
 const styles = StyleSheet.create({
+  active: { color: theme.accent },
   container: {
-    backgroundColor: "#fff",
-    borderTopColor: "#e0e0e0",
+    backgroundColor: "rgba(8, 9, 13, 0.98)",
+    borderTopColor: theme.line,
     borderTopWidth: 1,
     flexDirection: "row",
-    paddingTop: 8,
+    paddingTop: 10,
   },
-  icon: {
-    fontSize: 20,
-    marginBottom: 2,
-  },
-  label: {
-    color: "#888",
-    fontSize: 11,
-    fontWeight: "500",
-  },
-  labelActive: {
-    color: "#E8750A",
-  },
-  tab: {
-    alignItems: "center",
-    flex: 1,
-  },
+  icon: { color: theme.muted, fontSize: 26, fontWeight: "900", marginBottom: 2 },
+  label: { color: theme.muted, fontSize: 12.5, fontWeight: "700" },
+  tab: { alignItems: "center", flex: 1, minHeight: 54, justifyContent: "center" },
 });

@@ -1,4 +1,4 @@
-export type ViewName = "explore" | "map" | "favorites" | "profile";
+export type ViewName = "explore" | "favorites" | "profile";
 
 export type LocationPoint = {
   label: string;
@@ -27,6 +27,7 @@ export type Restaurant = {
   phoneNumber?: string;
   photoName?: string;
   priceLevel?: string;
+  priceRange?: string;
   rating?: number;
   sourceLabel: string;
   userRatingCount?: number;
@@ -46,6 +47,10 @@ export type GooglePlace = {
   name?: string;
   photos?: Array<{ name?: string }>;
   priceLevel?: string;
+  priceRange?: {
+    startPrice?: { currencyCode?: string; units?: string };
+    endPrice?: { currencyCode?: string; units?: string };
+  };
   primaryType?: string;
   primaryTypeDisplayName?: { text?: string };
   rating?: number;
@@ -91,7 +96,9 @@ export type AppSettings = {
   foodPreferences: string[];
   language: "es" | "en" | "fr" | "de" | "it" | "pt";
   mapsMode: "new-tab" | "same-tab" | "external-app";
+  maxPrice: "all" | "10" | "15" | "20";
   openMapsInNewTab: boolean;
+  openNow: boolean;
   sortMode: "best" | "favorites" | "nearest";
 };
 
@@ -99,8 +106,10 @@ export type AppState = {
   activeRestaurants: Restaurant[];
   currentLocation: LocationPoint;
   favorites: FavoriteRestaurant[];
+  pendingSearch: string | null;
   providerErrorMessage: string;
   recentSearches: string[];
+  savedCategories: string[];
   selectedRestaurantId: string | null;
   settings: AppSettings;
   view: ViewName;

@@ -93,6 +93,17 @@ function normalizeGooglePlace(place: GooglePlace, query: string): Restaurant {
   const longitude = Number(location.longitude);
   const primaryType = (place.primaryTypeDisplayName?.text || place.primaryType || "Restaurante").replaceAll("_", " ");
 
+  // Rango de precio real de Google (ej. "€10–20"). Símbolo según moneda.
+  let priceRange: string | undefined;
+  const range = place.priceRange;
+  if (range?.startPrice?.units || range?.endPrice?.units) {
+    const symbols: Record<string, string> = { EUR: "€", USD: "$", GBP: "£" };
+    const sym = symbols[range.startPrice?.currencyCode || range.endPrice?.currencyCode || "EUR"] || "";
+    const start = range.startPrice?.units;
+    const end = range.endPrice?.units;
+    priceRange = start && end ? `${sym}${start}–${end}` : `${sym}${start || end}`;
+  }
+
   return {
     area: place.formattedAddress || primaryType,
     foods: [
@@ -112,6 +123,7 @@ function normalizeGooglePlace(place: GooglePlace, query: string): Restaurant {
     phoneNumber: place.internationalPhoneNumber,
     photoName: place.photos?.[0]?.name,
     priceLevel: place.priceLevel ? priceLevelLabels[place.priceLevel] : undefined,
+    priceRange,
     rating: place.rating,
     sourceLabel: primaryType,
     userRatingCount: place.userRatingCount,

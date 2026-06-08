@@ -39,16 +39,35 @@ export async function fetchLocationSuggestions(query: string): Promise<Geocoding
   });
 
   lastLocationSearchAt = Date.now();
-  const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
-    headers: { Accept: "application/json" },
-  });
 
-  if (!response.ok) throw new Error("Falló la búsqueda de ubicación");
+  // Timeout + abort to avoid infinite spinner on slow networks
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-  const places = (await response.json()) as GeocodingPlace[];
-  if (locationSearchCache.size >= GEOCODING_CACHE_MAX) {
-    locationSearchCache.delete(locationSearchCache.keys().next().value!);
+  try {
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+      headers: {
+        Accept: "application/json",
+        // Nominatim ToS requires a valid User-Agent identifying your app
+        "User-Agent": "SavvyFoodie/0.2.0 (com.caroldenissetorres.savvyfoodie)",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) throw new Error("Falló la búsqueda de ubicación");
+
+    const places = (await response.json()) as GeocodingPlace[];
+    if (locationSearchCache.size >= GEOCODING_CACHE_MAX) {
+      locationSearchCache.delete(locationSearchCache.keys().next().value!);
+    }
+    locationSearchCache.set(normalizedQuery, places);
+    return places;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("La búsqueda de ubicación tardó demasiado.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  locationSearchCache.set(normalizedQuery, places);
-  return places;
 }
