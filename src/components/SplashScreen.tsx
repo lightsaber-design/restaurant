@@ -1,38 +1,28 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
-import Svg, { Line } from "react-native-svg";
 import { AntojoLogo } from "./AntojoLogo";
 
 interface Props {
   onDone: () => void;
 }
 
-// Map grid — now cross-platform via react-native-svg
+// Map grid — pure View implementation (no SVG required)
 function MapGrid({ width, height }: { width: number; height: number }) {
-  const hLines = Array.from({ length: 8 }, (_, i) => (
-    <Line
-      key={"h" + i}
-      x1="0" y1={40 + i * (height / 7)}
-      x2={width} y2={20 + i * (height / 7)}
-      stroke="#DDE6D8" strokeWidth="1.5"
-    />
-  ));
-  const vLines = Array.from({ length: 6 }, (_, i) => (
-    <Line
-      key={"v" + i}
-      x1={30 + i * (width / 5)} y1="0"
-      x2={50 + i * (width / 5)} y2={height}
-      stroke="#DDE6D8" strokeWidth="1.5"
-    />
-  ));
   return (
-    <Svg
-      width={width} height={height}
-      style={StyleSheet.absoluteFill}
-    >
-      {hLines}
-      {vLines}
-    </Svg>
+    <View style={StyleSheet.absoluteFill}>
+      {Array.from({ length: 8 }, (_, i) => (
+        <View
+          key={"h" + i}
+          style={{ position: "absolute", left: 0, right: 0, top: 40 + i * (height / 7), height: 1.5, backgroundColor: "#DDE6D8" }}
+        />
+      ))}
+      {Array.from({ length: 6 }, (_, i) => (
+        <View
+          key={"v" + i}
+          style={{ position: "absolute", top: 0, bottom: 0, left: 30 + i * (width / 5), width: 1.5, backgroundColor: "#DDE6D8" }}
+        />
+      ))}
+    </View>
   );
 }
 

@@ -1,5 +1,5 @@
 import React from "react";
-import Svg, { Path, Circle } from "react-native-svg";
+import { View } from "react-native";
 
 interface Props {
   size?: number;
@@ -11,23 +11,44 @@ interface Props {
   bite?: string;
 }
 
-// Map-pin with bitten hole — exact MarkAntojo from design, cross-platform via react-native-svg
+// Map-pin logo using Views only — no native SVG required.
+// Restore SVG version after: npx expo run:android
 export function AntojoLogo({ size = 104, c = "#FFFFFF", bg = "#15903F", bite = "#FF6B4A" }: Props) {
+  const circleD = size * 0.78;
+  const circleR = circleD / 2;
+  const holeD = circleD * 0.44;
+  const holeR = holeD / 2;
+  const dotD = circleD * 0.13;
+  const dotR = dotD / 2;
+  // Triangle pointing downward
+  const triBase = circleD * 0.44;
+  const triH = size - circleD;
+
   return (
-    <Svg width={size} height={size} viewBox="0 0 100 100" fill="none">
-      {/* Pin body */}
-      <Path
-        d="M50 7C31 7 17.5 21 17.5 40c0 22 24.5 41.5 30.2 47.6a3.1 3.1 0 0 0 4.6 0C58 81.5 82.5 62 82.5 40 82.5 21 69 7 50 7Z"
-        fill={c}
-      />
-      {/* Inner window */}
-      <Circle cx="50" cy="39" r="16.5" fill={bg} />
-      {/* Top-right overlap circle */}
-      <Circle cx="63" cy="29" r="9.5" fill={c} />
-      {/* Bite-mark dots */}
-      <Circle cx="46" cy="36" r="2.4" fill={bite} />
-      <Circle cx="54" cy="42" r="2.4" fill={bite} />
-      <Circle cx="45" cy="45" r="2.4" fill={bite} />
-    </Svg>
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "flex-start", paddingTop: size * 0.06 }}>
+      {/* Circle head */}
+      <View style={{
+        width: circleD, height: circleD, borderRadius: circleR,
+        backgroundColor: c, alignItems: "center", justifyContent: "center",
+      }}>
+        {/* Inner window */}
+        <View style={{ width: holeD, height: holeD, borderRadius: holeR, backgroundColor: bg }} />
+        {/* Bite dot 1 */}
+        <View style={{ position: "absolute", width: dotD, height: dotD, borderRadius: dotR, backgroundColor: bite, top: circleD * 0.3, left: circleD * 0.24 }} />
+        {/* Bite dot 2 */}
+        <View style={{ position: "absolute", width: dotD, height: dotD, borderRadius: dotR, backgroundColor: bite, top: circleD * 0.46, left: circleD * 0.52 }} />
+        {/* Bite dot 3 */}
+        <View style={{ position: "absolute", width: dotD, height: dotD, borderRadius: dotR, backgroundColor: bite, top: circleD * 0.54, left: circleD * 0.22 }} />
+      </View>
+      {/* Pin tip triangle */}
+      <View style={{
+        marginTop: -1,
+        width: 0, height: 0,
+        borderLeftWidth: triBase / 2, borderRightWidth: triBase / 2,
+        borderTopWidth: Math.max(triH, 2),
+        borderLeftColor: "transparent", borderRightColor: "transparent",
+        borderTopColor: c,
+      }} />
+    </View>
   );
 }
