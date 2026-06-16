@@ -79,7 +79,7 @@ export function SplashScreen({ onDone }: Props) {
   return (
     <Animated.View style={[styles.root, { opacity: screenOpacity }]}>
       {/* Full-screen map grid */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
         <MapGrid width={400} height={800} />
       </View>
 

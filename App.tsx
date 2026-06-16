@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { StatusBar, View } from "react-native";
+import { Platform, StatusBar, UIManager, View } from "react-native";
+
+// LayoutAnimation necesita habilitación explícita en Android
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import TabBar from "./src/components/TabBar";
 import ExploreScreen from "./src/screens/ExploreScreen";
