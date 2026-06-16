@@ -11,6 +11,7 @@ import { fetchLocationSuggestions, getShortLocationName } from "../providers/geo
 import { theme } from "../theme";
 import type { GeocodingPlace } from "../types";
 import { appConfig } from "../config";
+import { AntojoLogo } from "../components/AntojoLogo";
 
 const FOOD_PREFERENCES = ["vegano", "sin gluten", "halal", "saludable", "barato", "rápido"];
 
@@ -86,7 +87,12 @@ export default function ProfileScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <Text style={styles.title}>Perfil</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={styles.headerLogo}>
+            <AntojoLogo size={20} c="#FFFFFF" bg={theme.accent} bite="#FF6B4A" />
+          </View>
+          <Text style={styles.title}>Perfil</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -178,7 +184,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <Text style={styles.version}>SavvyFoodie v{appConfig.appVersion}</Text>
+        <Text style={styles.version}>Antojo v{appConfig.appVersion}</Text>
       </ScrollView>
     </View>
   );
@@ -198,20 +204,21 @@ const styles = StyleSheet.create({
   field: { marginTop: 14 },
   fieldLabel: { color: theme.muted, fontSize: 12.5, fontWeight: "800", marginBottom: 8 },
   h3: { color: theme.text, fontSize: 17, fontWeight: "800", marginBottom: 4 },
-  header: { backgroundColor: "rgba(8, 9, 13, 0.98)", borderBottomColor: theme.line, borderBottomWidth: 1, paddingBottom: 14, paddingHorizontal: 16 },
+  header: { backgroundColor: theme.bgTop, borderBottomColor: theme.line, borderBottomWidth: 1, paddingBottom: 14, paddingHorizontal: 16, flexDirection: "row", alignItems: "center" },
+  headerLogo: { width: 32, height: 32, borderRadius: 10, backgroundColor: theme.accent, alignItems: "center", justifyContent: "center" },
   locInput: { backgroundColor: theme.inputBg, borderColor: theme.line, borderRadius: 999, borderWidth: 1, color: theme.text, marginTop: 12, minHeight: 48, paddingHorizontal: 16 },
   pill: { backgroundColor: theme.inputBg, borderColor: theme.line, borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
   pillActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   pillRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   pillText: { color: theme.text, fontSize: 13, fontWeight: "700" },
-  pillTextActive: { color: "#111015" },
+  pillTextActive: { color: theme.onAccent },
   prefChip: { backgroundColor: theme.panel2, borderColor: theme.line, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   prefChipActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   prefGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 10 },
   prefText: { color: theme.text, fontSize: 13, fontWeight: "800" },
-  prefTextActive: { color: "#111015" },
+  prefTextActive: { color: theme.onAccent },
   primaryBtn: { alignItems: "center", backgroundColor: theme.accent, borderRadius: 999, marginTop: 16, minHeight: 48, justifyContent: "center", paddingHorizontal: 16 },
-  primaryBtnText: { color: "#111015", fontWeight: "900" },
+  primaryBtnText: { color: theme.onAccent, fontWeight: "900" },
   screen: { backgroundColor: theme.bg, flex: 1 },
   sectionDivider: { borderTopColor: theme.line, borderTopWidth: 1, marginTop: 18, paddingTop: 18 },
   suggestion: { borderBottomColor: theme.line, borderBottomWidth: 1, paddingVertical: 13 },

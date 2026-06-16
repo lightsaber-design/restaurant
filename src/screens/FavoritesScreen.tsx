@@ -19,6 +19,7 @@ import { CATEGORIES, MORE_CATEGORIES, theme } from "../theme";
 import type { FavoriteRestaurant } from "../types";
 import { getDistanceKm } from "../utils/geo";
 import { appConfig } from "../config";
+import { AntojoLogo } from "../components/AntojoLogo";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -376,7 +377,7 @@ export default function FavoritesScreen() {
 
   function exportBackup() {
     const backup = JSON.stringify({ exportedAt: new Date().toISOString(), favorites: appState.favorites, version: appConfig.appVersion }, null, 2);
-    void Share.share({ message: backup, title: "SavvyFoodie backup" });
+    void Share.share({ message: backup, title: "Antojo backup" });
   }
 
   function toggleSelect(id: string) {
@@ -398,7 +399,12 @@ export default function FavoritesScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <Text style={styles.title}>Favoritos</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={styles.headerLogo}>
+            <AntojoLogo size={20} c="#FFFFFF" bg={theme.accent} bite="#FF6B4A" />
+          </View>
+          <Text style={styles.title}>Favoritos</Text>
+        </View>
         <View style={styles.countPill}><Text style={styles.countText}>{appState.favorites.length}</Text></View>
       </View>
 
@@ -514,7 +520,7 @@ const styles = StyleSheet.create({
   barBtn: { backgroundColor: theme.panel2, borderColor: theme.line, borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
   barBtnActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   barBtnText: { color: theme.text, fontSize: 13, fontWeight: "900" },
-  barBtnTextActive: { color: "#111015" },
+  barBtnTextActive: { color: "#FFFFFF" },
   barRow: { flexDirection: "row", gap: 8, marginBottom: 18 },
   card: { backgroundColor: theme.panel, borderColor: theme.line, borderRadius: 20, borderWidth: 1, padding: 16 },
   cardHead: { alignItems: "center", flexDirection: "row", marginBottom: 4 },
@@ -523,7 +529,7 @@ const styles = StyleSheet.create({
 
   // Modal de añadir categorías
   addCatBtn: { alignItems: "center", backgroundColor: theme.accent, borderRadius: 12, height: 46, justifyContent: "center", width: 46 },
-  addCatBtnText: { color: "#111015", fontSize: 24, fontWeight: "900" },
+  addCatBtnText: { color: "#FFFFFF", fontSize: 24, fontWeight: "900" },
   addCatCheck: { color: theme.accent, fontSize: 14, marginTop: 2 },
   addCatClose: { color: theme.text, fontSize: 28, lineHeight: 32 },
   addCatCustomRow: { flexDirection: "row", gap: 10, paddingHorizontal: 2 },
@@ -567,7 +573,7 @@ const styles = StyleSheet.create({
   catChip: {
     alignItems: "center",
     backgroundColor: theme.accentChipBg,
-    borderColor: "rgba(169,133,255,0.35)",
+    borderColor: "rgba(22,163,74,0.35)",
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: "row",
@@ -588,7 +594,7 @@ const styles = StyleSheet.create({
   },
   catChipAddText: { color: theme.muted, fontSize: 20, fontWeight: "700" },
   catChipLabel: { paddingHorizontal: 12, paddingVertical: 8 },
-  catChipRemove: { borderLeftColor: "rgba(169,133,255,0.25)", borderLeftWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  catChipRemove: { borderLeftColor: "rgba(22,163,74,0.25)", borderLeftWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
   catChipRemoveText: { color: theme.accentChipText, fontSize: 16, fontWeight: "700" },
   catChipText: { color: theme.accentChipText, fontSize: 13, fontWeight: "800" },
   catChips: { flexDirection: "row", flexWrap: "wrap" },
@@ -612,7 +618,7 @@ const styles = StyleSheet.create({
   catSectionHead: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
   catSectionTitle: { color: theme.text, fontSize: 17, fontWeight: "800" },
   addCatOpenBtn: { backgroundColor: theme.accent, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
-  addCatOpenBtnText: { color: "#111015", fontSize: 13, fontWeight: "900" },
+  addCatOpenBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
 
   // Compare
   compareCard: { backgroundColor: theme.panel2, borderColor: theme.line, borderRadius: 16, borderWidth: 1, marginBottom: 12, padding: 14 },
@@ -634,18 +640,19 @@ const styles = StyleSheet.create({
   emptyText: { color: theme.muted, fontSize: 14, lineHeight: 21, marginTop: 6 },
   emptyTitle: { color: theme.text, fontSize: 18, fontWeight: "800" },
   expand: { color: theme.muted2, fontSize: 14, padding: 4 },
-  header: { alignItems: "center", backgroundColor: "rgba(8, 9, 13, 0.98)", borderBottomColor: theme.line, borderBottomWidth: 1, flexDirection: "row", justifyContent: "space-between", paddingBottom: 14, paddingHorizontal: 16 },
+  header: { alignItems: "center", backgroundColor: theme.bgTop, borderBottomColor: theme.line, borderBottomWidth: 1, flexDirection: "row", justifyContent: "space-between", paddingBottom: 14, paddingHorizontal: 16 },
+  headerLogo: { width: 32, height: 32, borderRadius: 10, backgroundColor: theme.accent, alignItems: "center", justifyContent: "center" },
   list: { gap: 14 },
   listChip: { backgroundColor: theme.inputBg, borderColor: theme.line, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
   listChipActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   listChipText: { color: theme.text, fontSize: 12.5 },
-  listChipTextActive: { color: "#111015", fontWeight: "800" },
+  listChipTextActive: { color: "#FFFFFF", fontWeight: "800" },
   listPicker: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   name: { color: theme.text, flex: 1, fontSize: 16, fontWeight: "800" },
   nearLabel: { color: theme.muted, fontSize: 14, fontWeight: "800" },
   nearRow: { alignItems: "center", backgroundColor: theme.panel2, borderColor: theme.line, borderRadius: 16, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", marginBottom: 12, padding: 14 },
   newListBtn: { alignItems: "center", backgroundColor: theme.accent, borderRadius: 12, height: 42, justifyContent: "center", width: 42 },
-  newListBtnText: { color: "#111015", fontSize: 22, fontWeight: "900" },
+  newListBtnText: { color: "#FFFFFF", fontSize: 22, fontWeight: "900" },
   newListInput: { backgroundColor: theme.inputBg, borderColor: theme.line, borderRadius: 12, borderWidth: 1, color: theme.text, flex: 1, paddingHorizontal: 12, paddingVertical: 10 },
   newListRow: { flexDirection: "row", gap: 8, marginTop: 8 },
   noteInput: { backgroundColor: theme.inputBg, borderColor: theme.line, borderRadius: 14, borderWidth: 1, color: theme.text, paddingHorizontal: 12, paddingVertical: 11, textAlignVertical: "top" },
@@ -658,7 +665,7 @@ const styles = StyleSheet.create({
   sortRow: { marginBottom: 12 },
   statusPill: { backgroundColor: theme.successBg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   statusText: { color: theme.success, fontSize: 12, fontWeight: "900" },
-  tag: { borderColor: "rgba(169, 133, 255, 0.35)", borderRadius: 999, borderWidth: 1, color: theme.accentChipText, fontSize: 12, fontWeight: "900", paddingHorizontal: 9, paddingVertical: 5 },
+  tag: { borderColor: "rgba(22, 163, 74, 0.35)", borderRadius: 999, borderWidth: 1, color: theme.accentChipText, fontSize: 12, fontWeight: "900", paddingHorizontal: 9, paddingVertical: 5 },
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
   tagsInput: { backgroundColor: theme.inputBg, borderColor: theme.line, borderRadius: 14, borderWidth: 1, color: theme.text, paddingHorizontal: 12, paddingVertical: 11 },
   title: { color: theme.text, fontSize: 24, fontWeight: "800" },
@@ -666,7 +673,7 @@ const styles = StyleSheet.create({
   toolChip: { backgroundColor: theme.panel2, borderColor: theme.line, borderRadius: 999, borderWidth: 1, marginRight: 6, paddingHorizontal: 14, paddingVertical: 9 },
   toolChipActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   toolChipText: { color: theme.text, fontSize: 13, fontWeight: "700" },
-  toolChipTextActive: { color: "#111015" },
+  toolChipTextActive: { color: "#FFFFFF" },
   toolRow: { flexDirection: "row" },
   toolScroll: { marginBottom: 12 },
 });

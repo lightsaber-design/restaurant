@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "SavvyFoodie",
-    "slug": "savvyfoodie",
+    "name": "Antojo",
+    "slug": "antojo",
     "version": "0.2.0",
     "orientation": "portrait",
     "scheme": "savvyfoodie",
@@ -10,7 +10,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#E8750A"
+        "backgroundColor": "#16A34A"
       },
       "package": "com.caroldenissetorres.savvyfoodie"
     },
@@ -27,7 +27,7 @@
           "image": "./assets/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#1A1A1A"
+          "backgroundColor": "#16A34A"
         }
       ]
     ],

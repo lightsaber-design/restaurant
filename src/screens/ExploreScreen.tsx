@@ -29,32 +29,14 @@ import {
 import { getFilteredResults } from "../selectors";
 import { CATEGORIES, MORE_CATEGORIES, theme } from "../theme";
 import { normalizeText } from "../utils/format";
+import { AntojoLogo } from "../components/AntojoLogo";
 import type { Restaurant } from "../types";
-
-const PRICE_CYCLE: Array<{ label: string; value: "all" | "10" | "15" | "20" }> = [
-  { label: "Cualquier precio", value: "all" },
-  { label: "< €10", value: "10" },
-  { label: "< €15", value: "15" },
-  { label: "< €20", value: "20" },
-];
-const DISTANCE_CYCLE: Array<{ label: string; value: "all" | "1" | "3" | "5" }> = [
-  { label: "Cualquier distancia", value: "all" },
-  { label: "1 km", value: "1" },
-  { label: "3 km", value: "3" },
-  { label: "5 km", value: "5" },
-];
-const SORT_CYCLE: Array<{ label: string; value: "best" | "nearest" | "favorites" }> = [
-  { label: "Mejor resultado", value: "best" },
-  { label: "Más cercanos", value: "nearest" },
-  { label: "Favoritos primero", value: "favorites" },
-];
-
-const ALL_CAT_DISHES = [...CATEGORIES.map((c) => c.dish), ...MORE_CATEGORIES];
 
 function buildLeafletHtml(
   center: { latitude: number; longitude: number },
   places: Restaurant[],
   selectedId: string | null,
+  accent = "#16A34A",
 ): string {
   const markers = places.map((p) => ({
     id: p.id,
@@ -68,62 +50,40 @@ function buildLeafletHtml(
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-  html,body,#map{height:100%;margin:0;background:#191a21;}
+  html,body,#map{height:100%;margin:0;background:#EBF1E6;}
   .leaflet-popup-content{font-family:sans-serif;font-weight:700;}
+  .pin{display:flex;align-items:center;justify-content:center;height:28px;min-width:44px;padding:0 9px;border-radius:99px;background:#fff;color:#15241B;border:2px solid ${accent};font-weight:800;font-size:12.5px;box-shadow:0 3px 10px rgba(0,0,0,.2);white-space:nowrap;cursor:pointer;}
+  .pin-sel{background:${accent};color:#fff;transform:scale(1.1);}
+  .pin-wrap{background:none!important;border:none!important;}
 </style>
 </head><body>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   var center=[${center.latitude},${center.longitude}];
-  var map=L.map('map',{zoomControl:true}).setView(center, ${places.length ? 14 : 12});
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    maxZoom:19, attribution:'© OpenStreetMap'
-  }).addTo(map);
+  var map=L.map('map',{zoomControl:false,attributionControl:false}).setView(center, ${places.length ? 14 : 12});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
   var markers=${JSON.stringify(markers)};
-  var group=[];
   markers.forEach(function(m){
     var icon=L.divIcon({
-      html:'<div style="background:'+(m.selected?'#a985ff':'#7f5af0')+';width:'+(m.selected?22:16)+'px;height:'+(m.selected?22:16)+'px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.5);"></div>',
-      className:'', iconSize:[22,22], iconAnchor:[11,11]
+      html:'<div class="pin'+(m.selected?' pin-sel':'')+'">📍</div>',
+      className:'pin-wrap', iconSize:[44,30], iconAnchor:[22,30]
     });
     var mk=L.marker([m.lat,m.lng],{icon:icon}).addTo(map);
-    mk.bindPopup('<b>'+m.name+'</b>');
     mk.on('click',function(){
       if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(m.id);}
     });
-    group.push([m.lat,m.lng]);
   });
-  if(group.length>1){ map.fitBounds(group,{padding:[40,40]}); }
 </script>
 </body></html>`;
 }
 
-// ── Barra de filtros rápidos ─────────────────────────────────────────────────
+// ── Quick filter chips ────────────────────────────────────────────────────────
 
-function QuickFilterBar() {
+function QuickFilterBar({ activeFilters, onToggle }: { activeFilters: Set<string>; onToggle: (k: string) => void }) {
   const appState = useAppState();
   const s = appState.settings;
-
-  function cyclePrice() {
-    const idx = PRICE_CYCLE.findIndex((o) => o.value === s.maxPrice);
-    const next = PRICE_CYCLE[(idx + 1) % PRICE_CYCLE.length]!;
-    updateSettings({ maxPrice: next.value });
-  }
-  function cycleDistance() {
-    const idx = DISTANCE_CYCLE.findIndex((o) => o.value === s.defaultRadiusKm);
-    const next = DISTANCE_CYCLE[(idx + 1) % DISTANCE_CYCLE.length]!;
-    updateSettings({ defaultRadiusKm: next.value });
-  }
-  function cycleSort() {
-    const idx = SORT_CYCLE.findIndex((o) => o.value === s.sortMode);
-    const next = SORT_CYCLE[(idx + 1) % SORT_CYCLE.length]!;
-    updateSettings({ sortMode: next.value });
-  }
-
-  const priceLabel = PRICE_CYCLE.find((o) => o.value === s.maxPrice)?.label ?? "Precio";
-  const distLabel = DISTANCE_CYCLE.find((o) => o.value === s.defaultRadiusKm)?.label ?? "Distancia";
-  const sortLabel = SORT_CYCLE.find((o) => o.value === s.sortMode)?.label ?? "Orden";
 
   return (
     <ScrollView
@@ -132,42 +92,29 @@ function QuickFilterBar() {
       style={styles.qfScroll}
       contentContainerStyle={styles.qfRow}
     >
-      {/* Abierto ahora */}
+      {/* Open now */}
       <TouchableOpacity
         style={[styles.qfChip, s.openNow && styles.qfChipOn]}
         onPress={() => updateSettings({ openNow: !s.openNow })}
       >
-        <Text style={styles.qfDot}>{s.openNow ? "🟢" : "⚫"}</Text>
         <Text style={[styles.qfText, s.openNow && styles.qfTextOn]}>
-          {s.openNow ? "Abiertos" : "Todos"}
+          🕐 {s.openNow ? "Abiertos" : "Abierto ahora"}
         </Text>
       </TouchableOpacity>
 
-      {/* Radio */}
-      <TouchableOpacity style={[styles.qfChip, s.defaultRadiusKm !== "all" && styles.qfChipOn]} onPress={cycleDistance}>
-        <Text style={styles.qfIcon}>📍</Text>
-        <Text style={[styles.qfText, s.defaultRadiusKm !== "all" && styles.qfTextOn]}>{distLabel}</Text>
-        <Text style={styles.qfArrow}>›</Text>
+      {/* Rating */}
+      <TouchableOpacity
+        style={[styles.qfChip, activeFilters.has("top") && styles.qfChipOn]}
+        onPress={() => onToggle("top")}
+      >
+        <Text style={[styles.qfText, activeFilters.has("top") && styles.qfTextOn]}>4.5+ ⭐</Text>
       </TouchableOpacity>
 
-      {/* Precio */}
-      <TouchableOpacity style={[styles.qfChip, s.maxPrice !== "all" && styles.qfChipOn]} onPress={cyclePrice}>
-        <Text style={styles.qfIcon}>💰</Text>
-        <Text style={[styles.qfText, s.maxPrice !== "all" && styles.qfTextOn]}>{priceLabel}</Text>
-        <Text style={styles.qfArrow}>›</Text>
-      </TouchableOpacity>
-
-      {/* Orden */}
-      <TouchableOpacity style={[styles.qfChip, s.sortMode !== "best" && styles.qfChipOn]} onPress={cycleSort}>
-        <Text style={styles.qfIcon}>↕</Text>
-        <Text style={[styles.qfText, s.sortMode !== "best" && styles.qfTextOn]}>{sortLabel}</Text>
-        <Text style={styles.qfArrow}>›</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
 
-// ── Pantalla principal ────────────────────────────────────────────────────────
+// ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ExploreScreen() {
   const appState = useAppState();
@@ -176,6 +123,7 @@ export default function ExploreScreen() {
   const [loading, setLoading] = useState(false);
   const [mapMode, setMapMode] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
 
   const search = useCallback(
     async (query: string) => {
@@ -194,17 +142,22 @@ export default function ExploreScreen() {
   );
 
   function searchDish(dish: string) {
-    const q = dish.trim();
-    if (!q) return;
+    const q = dish === "all" ? "" : dish.trim();
     setDishText(q);
     setSuggestOpen(false);
     setSelectedRestaurant(null);
-    addRecentSearch(q);
-    addSmartHistory(q);
+    if (q) { addRecentSearch(q); addSmartHistory(q); }
     void search(q);
   }
 
-  // Auto-búsqueda cuando viene desde Favoritos (categoría guardada)
+  function toggleFilter(key: string) {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
   useEffect(() => {
     if (!appState.pendingSearch) return;
     const q = appState.pendingSearch;
@@ -221,88 +174,89 @@ export default function ExploreScreen() {
     if (dishText.length < 3) return null;
     const q = normalizeText(dishText);
     const saved = appState.savedCategories.filter((c) => normalizeText(c).includes(q));
-    const unsaved = ALL_CAT_DISHES.filter(
-      (c) => normalizeText(c).includes(q) && !appState.savedCategories.includes(c),
-    );
+    const unsaved = [...CATEGORIES.filter((c) => c.dish !== "all"), ...MORE_CATEGORIES.map((d) => ({ dish: d, emoji: null, label: d }))]
+      .filter((c) => normalizeText(c.label ?? c.dish).includes(q) && !appState.savedCategories.includes(c.dish));
     return { saved, unsaved };
   }, [dishText, appState.savedCategories]);
 
-  const showSuggestions = suggestOpen && suggestions !== null;
+  let results = getFilteredResults(dishText);
+  if (activeFilters.has("top")) results = results.filter((r) => (r.rating ?? 0) >= 4.5);
 
-  const results = getFilteredResults(dishText);
   const hasError = appState.providerErrorMessage !== "";
   const hasSearched = appState.activeRestaurants.length > 0 || hasError || loading;
+  const showSuggestions = suggestOpen && suggestions !== null;
 
   const mapResults = getFilteredResults("");
   const mapSelected = mapResults.find((r) => r.id === appState.selectedRestaurantId) || mapResults[0] || null;
+  const mapKey = `${appState.currentLocation.latitude},${appState.currentLocation.longitude}|${mapResults.map((r) => r.id).join(",")}|${mapSelected?.id ?? ""}`;
   const mapHtml = useMemo(
-    () => buildLeafletHtml(appState.currentLocation, mapResults, mapSelected?.id ?? null),
+    () => buildLeafletHtml(appState.currentLocation, mapResults, mapSelected?.id ?? null, theme.accent),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [appState.currentLocation.latitude, appState.currentLocation.longitude, mapResults.length, mapSelected?.id],
+    [mapKey],
   );
-
-  function getCatEmoji(dish: string): string | null {
-    return CATEGORIES.find((c) => c.dish === dish)?.emoji ?? null;
-  }
 
   return (
     <View style={styles.screen}>
-      {/* Top bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
-        <View style={styles.brand}>
-          <Text style={styles.brandMark}>🍴</Text>
+      {/* ── Sticky top bar ── */}
+      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+        {/* Brand row */}
+        <View style={styles.brandRow}>
+          <View style={styles.brandLogo}>
+            <AntojoLogo size={26} c="#FFFFFF" bg={theme.accent} bite="#FF6B4A" />
+          </View>
           <View style={styles.brandText}>
-            <Text style={styles.brandTitle}>SavvyFoodie</Text>
-            <TouchableOpacity onPress={() => setView("profile")}>
-              <Text style={styles.locationChip} numberOfLines={1}>{appState.currentLocation.label}</Text>
+            <Text style={styles.brandTitle}>Antojo</Text>
+            <TouchableOpacity onPress={() => setView("profile")} style={styles.locationBtn}>
+              <Text style={styles.locationPin}>📍</Text>
+              <Text style={styles.locationLabel} numberOfLines={1}>{appState.currentLocation.label}</Text>
+              <Text style={styles.locationChevron}>›</Text>
+            </TouchableOpacity>
+          </View>
+          {/* List / Map toggle */}
+          <View style={styles.viewToggle}>
+            <TouchableOpacity
+              style={[styles.toggleBtn, !mapMode && styles.toggleBtnActive]}
+              onPress={() => setMapMode(false)}
+            >
+              <Text style={[styles.toggleBtnText, !mapMode && styles.toggleBtnTextActive]}>≡ Lista</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, mapMode && styles.toggleBtnActive]}
+              onPress={() => setMapMode(true)}
+            >
+              <Text style={[styles.toggleBtnText, mapMode && styles.toggleBtnTextActive]}>⊞ Mapa</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Lista / Mapa toggle */}
-        <View style={styles.viewToggle}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, !mapMode && styles.toggleBtnActive]}
-            onPress={() => setMapMode(false)}
-          >
-            <Text style={[styles.toggleBtnText, !mapMode && styles.toggleBtnTextActive]}>Lista</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, mapMode && styles.toggleBtnActive]}
-            onPress={() => setMapMode(true)}
-          >
-            <Text style={[styles.toggleBtnText, mapMode && styles.toggleBtnTextActive]}>Mapa</Text>
-          </TouchableOpacity>
+        {/* Search bar */}
+        <View style={styles.searchWrap}>
+          <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>⌕</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Busca tu antojo (ej. hamburguesas)"
+              placeholderTextColor={theme.muted2}
+              value={dishText}
+              onChangeText={(v) => {
+                setDishText(v);
+                setSuggestOpen(v.length >= 3);
+              }}
+              onSubmitEditing={() => searchDish(dishText)}
+              returnKeyType="search"
+            />
+            {dishText.length > 0 && (
+              <TouchableOpacity onPress={() => { setDishText(""); setSuggestOpen(false); }} hitSlop={10}>
+                <Text style={styles.clearBtn}>×</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
+
       </View>
 
-      {/* Search box */}
-      <View style={styles.searchWrap}>
-        <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>⌕</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Busca tu antojo (ej. hamburguesas)"
-            placeholderTextColor={theme.muted2}
-            value={dishText}
-            onChangeText={(v) => {
-              setDishText(v);
-              setSuggestOpen(v.length >= 3);
-            }}
-            onSubmitEditing={() => searchDish(dishText)}
-            returnKeyType="search"
-          />
-          {dishText.length > 0 && (
-            <TouchableOpacity onPress={() => { setDishText(""); setSuggestOpen(false); }} hitSlop={10}>
-              <Text style={styles.clearBtn}>×</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Content */}
+      {/* ── Content ── */}
       {showSuggestions ? (
-        /* ── Sugerencias ── */
         <ScrollView
           style={styles.suggestScroll}
           contentContainerStyle={styles.suggestContent}
@@ -314,28 +268,21 @@ export default function ExploreScreen() {
               {suggestions!.saved.map((cat) => (
                 <TouchableOpacity key={cat} style={styles.suggestRow} onPress={() => searchDish(cat)}>
                   <Text style={styles.suggestStar}>★</Text>
-                  <Text style={styles.suggestLabel}>
-                    {getCatEmoji(cat) ? `${getCatEmoji(cat)} ` : ""}{cat.charAt(0).toUpperCase() + cat.slice(1)}
-                  </Text>
+                  <Text style={styles.suggestLabel}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</Text>
                 </TouchableOpacity>
               ))}
             </>
           )}
-
           {suggestions!.unsaved.length > 0 && (
             <>
               <Text style={styles.suggestSection}>Categorías</Text>
               {suggestions!.unsaved.map((cat) => (
-                <TouchableOpacity key={cat} style={styles.suggestRow} onPress={() => searchDish(cat)}>
-                  <Text style={styles.suggestLabel}>
-                    {getCatEmoji(cat) ? `${getCatEmoji(cat)} ` : ""}{cat.charAt(0).toUpperCase() + cat.slice(1)}
-                  </Text>
+                <TouchableOpacity key={cat.dish} style={styles.suggestRow} onPress={() => searchDish(cat.dish)}>
+                  <Text style={styles.suggestLabel}>{(cat.label ?? cat.dish).charAt(0).toUpperCase() + (cat.label ?? cat.dish).slice(1)}</Text>
                 </TouchableOpacity>
               ))}
             </>
           )}
-
-          {/* Raw query */}
           <TouchableOpacity style={styles.suggestRaw} onPress={() => searchDish(dishText)}>
             <Text style={styles.searchIcon}>⌕</Text>
             <Text style={styles.suggestRawText}>Buscar "{dishText}"</Text>
@@ -343,13 +290,13 @@ export default function ExploreScreen() {
         </ScrollView>
       ) : mapMode ? (
         /* ── Vista Mapa ── */
-        <ScrollView contentContainerStyle={styles.mapContent} showsVerticalScrollIndicator={false}>
-          <QuickFilterBar />
-          <View style={styles.mapFrame}>
+        <View style={{ flex: 1 }}>
+          <QuickFilterBar activeFilters={activeFilters} onToggle={toggleFilter} />
+          <View style={{ flex: 1, position: "relative" }}>
             {WebView ? (
               <WebView
                 source={{ html: mapHtml }}
-                style={styles.webview}
+                style={{ flex: 1, backgroundColor: theme.panel2 }}
                 originWhitelist={["*"]}
                 javaScriptEnabled
                 domStorageEnabled
@@ -362,32 +309,33 @@ export default function ExploreScreen() {
               </View>
             )}
           </View>
-
+          {/* bottom carousel */}
           {mapResults.length > 0 && (
-            <View style={styles.placeList}>
-              {mapResults.slice(0, 8).map((r, i) => {
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.mapCarousel}
+              contentContainerStyle={styles.mapCarouselContent}
+            >
+              {mapResults.slice(0, 8).map((r) => {
                 const active = r.id === mapSelected?.id;
                 return (
                   <TouchableOpacity
                     key={r.id}
-                    style={[styles.placeItem, active && styles.placeItemActive]}
+                    style={[styles.mapCard, active && styles.mapCardActive]}
                     onPress={() => setSelectedRestaurant(r.id)}
                   >
-                    <Text style={styles.placeName} numberOfLines={1}>{i + 1}. {r.name}</Text>
-                    <Text style={styles.placeMeta}>A {(r.distanceKm ?? 0).toFixed(1)} km</Text>
+                    <Text style={styles.mapCardName} numberOfLines={1}>{r.name}</Text>
+                    <Text style={styles.mapCardMeta}>{(r.distanceKm ?? 0).toFixed(1)} km · {r.area}</Text>
+                    {r.rating !== undefined && (
+                      <Text style={styles.mapCardRating}>★ {r.rating.toFixed(1)}</Text>
+                    )}
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
           )}
-
-          {mapResults.length === 0 && (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>Sin restaurantes en el mapa</Text>
-              <Text style={styles.emptyText}>Haz una búsqueda en la vista de lista para verlos aquí.</Text>
-            </View>
-          )}
-        </ScrollView>
+        </View>
       ) : (
         /* ── Vista Lista ── */
         <ScrollView
@@ -395,44 +343,48 @@ export default function ExploreScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <QuickFilterBar />
+          <QuickFilterBar activeFilters={activeFilters} onToggle={toggleFilter} />
 
-          {/* Resultados */}
-          <View style={styles.block}>
-            <View style={styles.sectionHeading}>
-              {hasSearched && !loading && (
-                <View style={styles.resultCount}>
-                  <Text style={styles.resultCountText}>{results.length} {results.length === 1 ? "lugar" : "lugares"}</Text>
-                </View>
-              )}
+          {/* Results header */}
+          {hasSearched && !loading && (
+            <View style={styles.resultsHeader}>
+              <View>
+                <Text style={styles.resultsTitle}>Cerca de ti</Text>
+                <Text style={styles.resultsCount}>
+                  {results.length} {results.length === 1 ? "lugar" : "lugares"} en {appState.currentLocation.label}
+                </Text>
+              </View>
             </View>
+          )}
 
-            {loading ? (
-              <View style={styles.loadingBox}>
-                <ActivityIndicator size="large" color={theme.accent} />
-                <Text style={styles.loadingText}>Buscando restaurantes…</Text>
-              </View>
-            ) : hasError ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>Google Places no está conectado</Text>
-                <Text style={styles.emptyText}>{appState.providerErrorMessage}</Text>
-              </View>
-            ) : results.length === 0 && appState.activeRestaurants.length > 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>Sin resultados con estos filtros</Text>
-                <Text style={styles.emptyText}>Prueba con otra comida o cambia los filtros.</Text>
-              </View>
-            ) : appState.activeRestaurants.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>Empieza una búsqueda</Text>
-                <Text style={styles.emptyText}>Elige una categoría o escribe tu antojo arriba.</Text>
-              </View>
-            ) : (
-              <View style={styles.resultsList}>
-                {results.map((r) => <RestaurantCard key={r.id} restaurant={r} />)}
-              </View>
-            )}
-          </View>
+          {loading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color={theme.accent} />
+              <Text style={styles.loadingText}>Buscando restaurantes…</Text>
+            </View>
+          ) : hasError ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🔌</Text>
+              <Text style={styles.emptyTitle}>Sin conexión a Places</Text>
+              <Text style={styles.emptyText}>{appState.providerErrorMessage}</Text>
+            </View>
+          ) : results.length === 0 && appState.activeRestaurants.length > 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🍽️</Text>
+              <Text style={styles.emptyTitle}>Sin coincidencias</Text>
+              <Text style={styles.emptyText}>Prueba con otra categoría o quita algún filtro.</Text>
+            </View>
+          ) : appState.activeRestaurants.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🔍</Text>
+              <Text style={styles.emptyTitle}>Empieza una búsqueda</Text>
+              <Text style={styles.emptyText}>Elige una categoría o escribe tu antojo arriba.</Text>
+            </View>
+          ) : (
+            <View style={styles.resultsList}>
+              {results.map((r) => <RestaurantCard key={r.id} restaurant={r} />)}
+            </View>
+          )}
         </ScrollView>
       )}
     </View>
@@ -440,100 +392,121 @@ export default function ExploreScreen() {
 }
 
 const styles = StyleSheet.create({
-  block: { marginBottom: 28 },
-  brand: { alignItems: "center", flexDirection: "row", flex: 1, gap: 12, minWidth: 0 },
-  brandMark: { color: theme.accent, fontSize: 30 },
-  brandText: { flex: 1, minWidth: 0 },
-  brandTitle: { color: theme.text, fontSize: 26, fontWeight: "900" },
-  clearBtn: { color: theme.muted2, fontSize: 24, fontWeight: "700", paddingHorizontal: 6 },
-  content: { paddingBottom: 120, paddingHorizontal: 16, paddingTop: 8 },
-  emptyState: { backgroundColor: theme.panel, borderColor: theme.line, borderRadius: 20, borderStyle: "dashed", borderWidth: 1, padding: 22 },
-  emptyText: { color: theme.muted, fontSize: 14, lineHeight: 21, marginTop: 6 },
-  emptyTitle: { color: theme.text, fontSize: 18, fontWeight: "800" },
-  loadingBox: { alignItems: "center", paddingVertical: 40 },
-  loadingText: { color: theme.muted, fontSize: 14, marginTop: 12 },
-  locationChip: { color: theme.muted, fontSize: 13, fontWeight: "800", marginTop: 2 },
-  // Quick filter bar
-  qfArrow: { color: theme.muted2, fontSize: 16, fontWeight: "700" },
-  qfChip: {
-    alignItems: "center",
-    backgroundColor: theme.panel2,
-    borderColor: theme.line,
-    borderRadius: 999,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 5,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-  },
-  qfChipOn: { backgroundColor: theme.accentChipBg, borderColor: "rgba(169,133,255,0.5)" },
-  qfDot: { fontSize: 11 },
-  qfIcon: { fontSize: 13 },
-  qfRow: { alignItems: "center", flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
-  qfScroll: { borderBottomColor: theme.line, borderBottomWidth: 1 },
-  qfText: { color: theme.muted, fontSize: 12.5, fontWeight: "700" },
-  qfTextOn: { color: theme.accentChipText },
-  mapContent: { paddingBottom: 120, paddingHorizontal: 16, paddingTop: 16 },
-  mapFallback: { alignItems: "center", flex: 1, justifyContent: "center", padding: 24 },
-  mapFallbackIcon: { fontSize: 48, marginBottom: 12 },
-  mapFallbackText: { color: theme.accent, fontSize: 16, fontWeight: "900" },
-  mapFrame: { aspectRatio: 3 / 4, backgroundColor: theme.panel2, borderColor: theme.line, borderRadius: 20, borderWidth: 1, minHeight: 360, overflow: "hidden" },
-  placeItem: { backgroundColor: theme.panel2, borderColor: theme.line, borderRadius: 16, borderWidth: 1, padding: 12 },
-  placeItemActive: { borderColor: theme.accent },
-  placeList: { gap: 10, marginTop: 14 },
-  placeMeta: { color: theme.muted, fontSize: 13, marginTop: 4 },
-  placeName: { color: theme.text, fontSize: 15, fontWeight: "700" },
-  resultCount: { backgroundColor: theme.accentChipBg, borderRadius: 999, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 8, alignSelf: "flex-start" },
-  resultCountText: { color: theme.accentChipText, fontSize: 13, fontWeight: "900" },
-  resultsList: { gap: 14 },
   screen: { backgroundColor: theme.bg, flex: 1 },
-  searchBox: {
-    alignItems: "center",
-    backgroundColor: theme.searchBg,
-    borderColor: theme.line,
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    minHeight: 60,
-    paddingHorizontal: 16,
-  },
-  searchIcon: { color: theme.muted, fontSize: 28 },
-  searchInput: { color: theme.text, flex: 1, fontSize: 16, fontWeight: "700" },
-  searchWrap: { paddingHorizontal: 16, paddingVertical: 12 },
-  sectionHeading: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
-  suggestContent: { paddingBottom: 80 },
-  suggestLabel: { color: theme.text, flex: 1, fontSize: 15, fontWeight: "700" },
-  suggestRaw: {
-    alignItems: "center",
-    borderTopColor: theme.line,
-    borderTopWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  suggestRawText: { color: theme.muted, fontSize: 15, fontStyle: "italic" },
-  suggestRow: { alignItems: "center", flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
-  suggestScroll: { flex: 1 },
-  suggestSection: { color: theme.muted, fontSize: 12, fontWeight: "900", letterSpacing: 1, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, textTransform: "uppercase" },
-  suggestStar: { color: theme.accent, fontSize: 16 },
-  toggleBtn: { borderColor: theme.line, borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7 },
-  toggleBtnActive: { backgroundColor: theme.accent, borderColor: theme.accent },
-  toggleBtnText: { color: theme.muted, fontSize: 13, fontWeight: "800" },
-  toggleBtnTextActive: { color: "#111015" },
+
+  // Top bar
   topBar: {
-    alignItems: "center",
-    backgroundColor: "rgba(8, 9, 13, 0.98)",
+    backgroundColor: theme.bgTop,
     borderBottomColor: theme.line,
     borderBottomWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    paddingBottom: 14,
-    paddingHorizontal: 16,
   },
-  viewToggle: { flexDirection: "row", gap: 6 },
-  webview: { backgroundColor: theme.panel2, flex: 1 },
+  brandRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingHorizontal: 18, paddingBottom: 12,
+  },
+  brandLogo: {
+    width: 42, height: 42, borderRadius: 14,
+    backgroundColor: theme.accent,
+    alignItems: "center", justifyContent: "center",
+    shadowColor: theme.accent, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 4,
+  },
+  brandLogoIcon: { fontSize: 20 },
+  brandText: { flex: 1, minWidth: 0 },
+  brandTitle: { fontSize: 19, fontWeight: "800", color: theme.text, letterSpacing: -0.6 },
+  locationBtn: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 1 },
+  locationPin: { fontSize: 11, color: theme.accent },
+  locationLabel: { fontSize: 13, fontWeight: "700", color: theme.muted, maxWidth: 140 },
+  locationChevron: { fontSize: 14, color: theme.muted2, fontWeight: "700" },
+  viewToggle: {
+    flexDirection: "row", gap: 4,
+    backgroundColor: theme.panel2, borderRadius: 99, padding: 3,
+  },
+  toggleBtn: {
+    paddingHorizontal: 11, height: 32, borderRadius: 99,
+    alignItems: "center", justifyContent: "center",
+  },
+  toggleBtnActive: { backgroundColor: theme.panel },
+  toggleBtnText: { color: theme.muted, fontSize: 13, fontWeight: "700" },
+  toggleBtnTextActive: { color: theme.accent, fontWeight: "800" },
+
+  // Search
+  searchWrap: { paddingHorizontal: 18, paddingBottom: 12 },
+  searchBox: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    height: 50, paddingHorizontal: 16,
+    backgroundColor: theme.searchBg, borderRadius: 16,
+    borderWidth: 1, borderColor: theme.line,
+    shadowColor: "#14281a", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
+  },
+  searchIcon: { color: theme.muted, fontSize: 20 },
+  searchInput: { color: theme.text, flex: 1, fontSize: 15, fontWeight: "600" },
+  clearBtn: { color: theme.muted2, fontSize: 22, fontWeight: "700", paddingHorizontal: 4 },
+
+  // Quick filter bar
+  qfScroll: {},
+  qfRow: { paddingHorizontal: 18, paddingVertical: 2, paddingBottom: 14, gap: 8, flexDirection: "row", alignItems: "center" },
+  qfChip: {
+    height: 36, paddingHorizontal: 14, borderRadius: 99,
+    backgroundColor: theme.chip, borderWidth: 1.5, borderColor: theme.line,
+    alignItems: "center", justifyContent: "center",
+  },
+  qfChipOn: { backgroundColor: theme.accentSoft, borderColor: "rgba(22,163,74,0.4)" },
+  qfText: { color: theme.text, fontSize: 13, fontWeight: "700" },
+  qfTextOn: { color: theme.accent },
+
+  // Content
+  content: { paddingBottom: 120, paddingHorizontal: 18, paddingTop: 4 },
+  resultsHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14 },
+  resultsTitle: { fontSize: 22, fontWeight: "800", color: theme.text, letterSpacing: -0.5 },
+  resultsCount: { fontSize: 13, color: theme.muted, fontWeight: "600", marginTop: 2 },
+  resultsList: { gap: 16 },
+
+  // Empty / loading
+  loadingBox: { alignItems: "center", paddingVertical: 60 },
+  loadingText: { color: theme.muted, fontSize: 14, marginTop: 12 },
+  emptyState: {
+    alignItems: "center", paddingVertical: 56, paddingHorizontal: 24,
+    backgroundColor: theme.panel, borderRadius: 24,
+    borderWidth: 1, borderColor: theme.line, marginTop: 16,
+  },
+  emptyIcon: { fontSize: 40, marginBottom: 10 },
+  emptyTitle: { color: theme.text, fontSize: 16, fontWeight: "800", textAlign: "center" },
+  emptyText: { color: theme.muted, fontSize: 13.5, lineHeight: 21, marginTop: 4, textAlign: "center" },
+
+  // Suggestions
+  suggestScroll: { flex: 1, backgroundColor: theme.bg },
+  suggestContent: { paddingBottom: 80 },
+  suggestSection: {
+    color: theme.muted, fontSize: 12, fontWeight: "900", letterSpacing: 0.8,
+    paddingHorizontal: 18, paddingTop: 16, paddingBottom: 4, textTransform: "uppercase",
+  },
+  suggestRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 18, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: theme.line,
+  },
+  suggestStar: { color: theme.accent, fontSize: 16 },
+  suggestLabel: { color: theme.text, flex: 1, fontSize: 15, fontWeight: "700" },
+  suggestRaw: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    marginTop: 4, paddingHorizontal: 18, paddingVertical: 16,
+    borderTopWidth: 1, borderTopColor: theme.line,
+  },
+  suggestRawText: { color: theme.muted, fontSize: 15, fontStyle: "italic" },
+
+  // Map
+  mapFallback: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  mapFallbackIcon: { fontSize: 48, marginBottom: 12 },
+  mapFallbackText: { color: theme.accent, fontSize: 16, fontWeight: "900" },
+  mapCarousel: { maxHeight: 130, backgroundColor: "transparent" },
+  mapCarouselContent: { paddingHorizontal: 18, paddingVertical: 10, gap: 12, flexDirection: "row" },
+  mapCard: {
+    width: 200, backgroundColor: theme.panel, borderRadius: 16,
+    padding: 12, borderWidth: 1.5, borderColor: theme.line,
+    shadowColor: "#14281a", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 3,
+  },
+  mapCardActive: { borderColor: theme.accent },
+  mapCardName: { color: theme.text, fontSize: 15.5, fontWeight: "800" },
+  mapCardMeta: { color: theme.muted, fontSize: 12.5, fontWeight: "600", marginTop: 2 },
+  mapCardRating: { color: theme.star, fontSize: 12.5, fontWeight: "700", marginTop: 6 },
 });
