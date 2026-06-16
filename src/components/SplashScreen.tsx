@@ -1,47 +1,49 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, Easing, Platform, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import Svg, { Line } from "react-native-svg";
 import { AntojoLogo } from "./AntojoLogo";
 
 interface Props {
   onDone: () => void;
 }
 
-// Map grid lines — web only (SVG), native skips
-function MapGrid() {
-  if (Platform.OS !== "web") return null;
-  const hLines = Array.from({ length: 7 }, (_, i) =>
-    React.createElement("line", {
-      key: "h" + i, x1: "0", y1: String(40 + i * 110),
-      x2: "100%", y2: String(20 + i * 110),
-      stroke: "#C8D8C3", strokeWidth: "1.5",
-    })
+// Map grid — now cross-platform via react-native-svg
+function MapGrid({ width, height }: { width: number; height: number }) {
+  const hLines = Array.from({ length: 8 }, (_, i) => (
+    <Line
+      key={"h" + i}
+      x1="0" y1={40 + i * (height / 7)}
+      x2={width} y2={20 + i * (height / 7)}
+      stroke="#DDE6D8" strokeWidth="1.5"
+    />
+  ));
+  const vLines = Array.from({ length: 6 }, (_, i) => (
+    <Line
+      key={"v" + i}
+      x1={30 + i * (width / 5)} y1="0"
+      x2={50 + i * (width / 5)} y2={height}
+      stroke="#DDE6D8" strokeWidth="1.5"
+    />
+  ));
+  return (
+    <Svg
+      width={width} height={height}
+      style={StyleSheet.absoluteFill}
+    >
+      {hLines}
+      {vLines}
+    </Svg>
   );
-  const vLines = Array.from({ length: 6 }, (_, i) =>
-    React.createElement("line", {
-      key: "v" + i, x1: String(30 + i * 80), y1: "0",
-      x2: String(50 + i * 80), y2: "100%",
-      stroke: "#C8D8C3", strokeWidth: "1.5",
-    })
-  );
-  return React.createElement(
-    "svg",
-    {
-      style: { position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" } as object,
-      xmlns: "http://www.w3.org/2000/svg",
-    },
-    ...hLines,
-    ...vLines
-  ) as unknown as React.ReactElement;
 }
 
 export function SplashScreen({ onDone }: Props) {
-  const dropY = useRef(new Animated.Value(-34)).current;
+  const dropY = useRef(new Animated.Value(-40)).current;
   const dropOpacity = useRef(new Animated.Value(0)).current;
   const shadowScale = useRef(new Animated.Value(0)).current;
   const screenOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // 1. Pin drops in with bounce (1.4s)
+    // Pin drops in with bounce (1.4s)
     Animated.parallel([
       Animated.timing(dropY, {
         toValue: 0,
@@ -51,7 +53,7 @@ export function SplashScreen({ onDone }: Props) {
       }),
       Animated.timing(dropOpacity, {
         toValue: 1,
-        duration: 280,
+        duration: 300,
         useNativeDriver: false,
       }),
       Animated.timing(shadowScale, {
@@ -62,7 +64,7 @@ export function SplashScreen({ onDone }: Props) {
       }),
     ]).start();
 
-    // 2. Fade screen out after 2.6s
+    // Fade out after 2.6s
     const timer = setTimeout(() => {
       Animated.timing(screenOpacity, {
         toValue: 0,
@@ -76,17 +78,18 @@ export function SplashScreen({ onDone }: Props) {
 
   return (
     <Animated.View style={[styles.root, { opacity: screenOpacity }]}>
-      <MapGrid />
+      {/* Full-screen map grid */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <MapGrid width={400} height={800} />
+      </View>
 
-      {/* Logo + shadow group */}
+      {/* Center content */}
       <View style={styles.center}>
+        {/* Pin with drop animation */}
         <Animated.View
           style={[
-            styles.logoWrap,
-            {
-              transform: [{ translateY: dropY }],
-              opacity: dropOpacity,
-            },
+            styles.pinWrap,
+            { transform: [{ translateY: dropY }], opacity: dropOpacity },
           ]}
         >
           <AntojoLogo size={96} c="#16A34A" bg="#FFFFFF" bite="#FF6B4A" />
@@ -117,26 +120,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     zIndex: 999,
+    elevation: 999,
   },
   center: {
     alignItems: "center",
   },
-  logoWrap: {
-    // Drop shadow via filter on web, elevation on native
-    ...Platform.select({
-      web: { filter: "drop-shadow(0 14px 18px rgba(20,40,26,0.22))" } as object,
-      default: { elevation: 12 },
-    }),
+  pinWrap: {
+    shadowColor: "rgba(20,40,26,1)",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 16,
   },
   castShadow: {
     width: 36,
     height: 8,
     borderRadius: 99,
     backgroundColor: "rgba(20,40,26,0.13)",
-    marginTop: 3,
+    marginTop: 4,
   },
   wordmark: {
-    marginTop: 24,
+    marginTop: 26,
     fontSize: 38,
     fontWeight: "800",
     color: "#15241B",
