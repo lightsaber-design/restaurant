@@ -5,6 +5,8 @@ try { WebView = require("react-native-webview").WebView; } catch {}
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  LayoutAnimation,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -79,40 +81,78 @@ function buildLeafletHtml(
 </body></html>`;
 }
 
-// ── Quick filter chips ────────────────────────────────────────────────────────
+// ── Collapsible filter panel ──────────────────────────────────────────────────
 
-function QuickFilterBar({ activeFilters, onToggle }: { activeFilters: Set<string>; onToggle: (k: string) => void }) {
-  const appState = useAppState();
-  const s = appState.settings;
+const QUICK_FILTERS = [
+  { key: "open", label: "Abierto ahora", icon: "🕐" },
+  { key: "top",  label: "Mejor valorados", icon: "⭐" },
+  { key: "cheap", label: "Económico", icon: "€" },
+  { key: "near", label: "A pie < 10 min", icon: "👟" },
+];
 
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.qfScroll}
-      contentContainerStyle={styles.qfRow}
-    >
-      {/* Open now */}
-      <TouchableOpacity
-        style={[styles.qfChip, s.openNow && styles.qfChipOn]}
-        onPress={() => updateSettings({ openNow: !s.openNow })}
-      >
-        <Text style={[styles.qfText, s.openNow && styles.qfTextOn]}>
-          🕐 {s.openNow ? "Abiertos" : "Abierto ahora"}
-        </Text>
-      </TouchableOpacity>
+function FilterPanel({
+  open, activeFilters, onToggle, onClear,
+}: {
+  open: boolean; activeFilters: Set<string>; onToggle: (k: string) => void; onClear: () => void;
+}) {
+  const count = activeFilters.size;
 
-      {/* Rating */}
-      <TouchableOpacity
-        style={[styles.qfChip, activeFilters.has("top") && styles.qfChipOn]}
-        onPress={() => onToggle("top")}
-      >
-        <Text style={[styles.qfText, activeFilters.has("top") && styles.qfTextOn]}>4.5+ ⭐</Text>
-      </TouchableOpacity>
-
-    </ScrollView>
+  const panel = (
+    <View style={fp.panel}>
+      <View style={fp.head}>
+        <Text style={fp.headLabel}>FILTRAR POR</Text>
+        <TouchableOpacity onPress={onClear} disabled={count === 0}>
+          <Text style={[fp.clearBtn, count === 0 && fp.clearBtnOff]}>Limpiar</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={fp.chips}>
+        {QUICK_FILTERS.map((f) => {
+          const active = activeFilters.has(f.key);
+          return (
+            <TouchableOpacity
+              key={f.key}
+              style={[fp.chip, active && fp.chipOn]}
+              onPress={() => onToggle(f.key)}
+              activeOpacity={0.75}
+            >
+              <Text style={fp.chipIcon}>{f.icon}</Text>
+              <Text style={[fp.chipText, active && fp.chipTextOn]}>{f.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
   );
+
+  if (Platform.OS === "web") {
+    return (
+      <View style={{
+        overflow: "hidden" as const,
+        maxHeight: open ? 200 : 0,
+        opacity: open ? 1 : 0,
+        // @ts-ignore web-only
+        transition: "max-height 0.34s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease",
+      }}>
+        {panel}
+      </View>
+    );
+  }
+  return open ? panel : null;
 }
+
+const fp = StyleSheet.create({
+  panel: { marginHorizontal: 18, marginBottom: 14, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16, borderRadius: 18, backgroundColor: theme.panel, borderWidth: 1, borderColor: theme.line, shadowColor: "#14281a", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2 },
+  head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  headLabel: { fontSize: 12, fontWeight: "800", color: theme.muted, letterSpacing: 0.6 },
+  clearBtn: { fontSize: 13, fontWeight: "700", color: theme.accent },
+  clearBtnOff: { color: theme.muted2, opacity: 0.6 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 7, height: 40, paddingHorizontal: 16, borderRadius: 13, backgroundColor: theme.panel2, borderWidth: 1.5, borderColor: theme.line },
+  chipOn: { backgroundColor: theme.accent, borderColor: theme.accent },
+  chipIcon: { fontSize: 14 },
+  chipText: { fontSize: 13.5, fontWeight: "700", color: theme.text },
+  chipTextOn: { color: theme.onAccent },
+});
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -124,6 +164,7 @@ export default function ExploreScreen() {
   const [mapMode, setMapMode] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const search = useCallback(
     async (query: string) => {
@@ -150,12 +191,25 @@ export default function ExploreScreen() {
     void search(q);
   }
 
+  const s = appState.settings;
+
   function toggleFilter(key: string) {
+    if (key === "open") { updateSettings({ openNow: !s.openNow }); return; }
     setActiveFilters((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+  }
+
+  function clearAllFilters() {
+    setActiveFilters(new Set());
+    if (s.openNow) updateSettings({ openNow: false });
+  }
+
+  function toggleFilterPanel() {
+    if (Platform.OS !== "web") LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setFilterOpen((v) => !v);
   }
 
   useEffect(() => {
@@ -179,8 +233,15 @@ export default function ExploreScreen() {
     return { saved, unsaved };
   }, [dishText, appState.savedCategories]);
 
+  // Build the effective filter set (includes store-backed "open")
+  const effectiveFilters = new Set(activeFilters);
+  if (s.openNow) effectiveFilters.add("open");
+  const filterCount = effectiveFilters.size;
+
   let results = getFilteredResults(dishText);
   if (activeFilters.has("top")) results = results.filter((r) => (r.rating ?? 0) >= 4.5);
+  if (activeFilters.has("cheap")) results = results.filter((r) => r.priceLevel === "PRICE_LEVEL_INEXPENSIVE" || r.priceLevel === "PRICE_LEVEL_FREE");
+  if (activeFilters.has("near")) results = results.filter((r) => (r.distanceKm ?? 99) <= 1);
 
   const hasError = appState.providerErrorMessage !== "";
   const hasSearched = appState.activeRestaurants.length > 0 || hasError || loading;
@@ -250,8 +311,29 @@ export default function ExploreScreen() {
                 <Text style={styles.clearBtn}>×</Text>
               </TouchableOpacity>
             )}
+            {/* Sliders button */}
+            <TouchableOpacity
+              style={[styles.slidersBtn, (filterOpen || filterCount > 0) && styles.slidersBtnOn]}
+              onPress={toggleFilterPanel}
+              hitSlop={4}
+            >
+              <Text style={[styles.slidersIcon, (filterOpen || filterCount > 0) && styles.slidersIconOn]}>⊕</Text>
+              {filterCount > 0 && (
+                <View style={styles.slidersBadge}>
+                  <Text style={styles.slidersBadgeText}>{filterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
+
+        {/* Collapsible filter panel */}
+        <FilterPanel
+          open={filterOpen}
+          activeFilters={effectiveFilters}
+          onToggle={toggleFilter}
+          onClear={clearAllFilters}
+        />
 
       </View>
 
@@ -291,7 +373,6 @@ export default function ExploreScreen() {
       ) : mapMode ? (
         /* ── Vista Mapa ── */
         <View style={{ flex: 1 }}>
-          <QuickFilterBar activeFilters={activeFilters} onToggle={toggleFilter} />
           <View style={{ flex: 1, position: "relative" }}>
             {WebView ? (
               <WebView
@@ -343,8 +424,6 @@ export default function ExploreScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <QuickFilterBar activeFilters={activeFilters} onToggle={toggleFilter} />
-
           {/* Results header */}
           {hasSearched && !loading && (
             <View style={styles.resultsHeader}>
@@ -442,17 +521,13 @@ const styles = StyleSheet.create({
   searchInput: { color: theme.text, flex: 1, fontSize: 15, fontWeight: "600" },
   clearBtn: { color: theme.muted2, fontSize: 22, fontWeight: "700", paddingHorizontal: 4 },
 
-  // Quick filter bar
-  qfScroll: {},
-  qfRow: { paddingHorizontal: 18, paddingVertical: 2, paddingBottom: 14, gap: 8, flexDirection: "row", alignItems: "center" },
-  qfChip: {
-    height: 36, paddingHorizontal: 14, borderRadius: 99,
-    backgroundColor: theme.chip, borderWidth: 1.5, borderColor: theme.line,
-    alignItems: "center", justifyContent: "center",
-  },
-  qfChipOn: { backgroundColor: theme.accentSoft, borderColor: "rgba(22,163,74,0.4)" },
-  qfText: { color: theme.text, fontSize: 13, fontWeight: "700" },
-  qfTextOn: { color: theme.accent },
+  // Sliders button
+  slidersBtn: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: theme.accentSoft },
+  slidersBtnOn: { backgroundColor: theme.accent },
+  slidersIcon: { fontSize: 19, color: theme.accent },
+  slidersIconOn: { color: theme.onAccent },
+  slidersBadge: { position: "absolute", top: -5, right: -5, minWidth: 18, height: 18, borderRadius: 99, backgroundColor: "#FF6B4A", alignItems: "center", justifyContent: "center", paddingHorizontal: 4, borderWidth: 2, borderColor: theme.bgTop },
+  slidersBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
   // Content
   content: { paddingBottom: 120, paddingHorizontal: 18, paddingTop: 4 },
