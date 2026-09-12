@@ -16,79 +16,152 @@ function buildMapsUrl(r: Restaurant, mode: "search" | "directions" = "search"): 
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.name} ${r.area}`)}`;
 }
 
+function priceLevelLabel(level?: string): string {
+  if (!level) return "";
+  const map: Record<string, string> = {
+    PRICE_LEVEL_FREE: "Gratis",
+    PRICE_LEVEL_INEXPENSIVE: "€",
+    PRICE_LEVEL_MODERATE: "€€",
+    PRICE_LEVEL_EXPENSIVE: "€€€",
+    PRICE_LEVEL_VERY_EXPENSIVE: "€€€€",
+  };
+  return map[level] ?? level;
+}
+
 export default function RestaurantCard({ restaurant }: { restaurant: Restaurant }) {
   const { favorites, selectedRestaurantId } = useAppState();
   const fav = favorites.some((f) => f.id === restaurant.id);
   const selected = restaurant.id === selectedRestaurantId;
   const [detailOpen, setDetailOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
-  const photoUrl = restaurant.photoName
+  const photoUrl = restaurant.photoName && !imgError
     ? `${appConfig.api.baseUrl}/api/places/photo?name=${encodeURIComponent(restaurant.photoName)}`
     : null;
-  const priceDisplay = restaurant.priceRange ?? restaurant.priceLevel ?? "Ver en Maps";
+
+  const priceLabel = priceLevelLabel(restaurant.priceLevel);
+  const distLabel = `${(restaurant.distanceKm ?? 0).toFixed(1)} km`;
 
   return (
     <View style={[styles.card, selected && styles.cardSelected]}>
-      {/* fila principal: info izquierda + precio/foto derecha */}
-      <View style={styles.topRow}>
-        <View style={styles.info}>
-          <View style={styles.titleBlock}>
-            <Text style={styles.name} numberOfLines={2}>{restaurant.name}</Text>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusText}>Google Places</Text>
+      {/* ── photo ── */}
+      <View style={styles.photoWrap}>
+        {photoUrl ? (
+          <Image
+            source={{ uri: photoUrl }}
+            style={styles.photo}
+            resizeMode="cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <View style={styles.photoFallback}>
+            <Text style={styles.photoFallbackIcon}>🍴</Text>
+          </View>
+        )}
+
+        {/* gradient overlay */}
+        <View style={styles.photoGradient} />
+
+        {/* top-left badge */}
+        <View style={styles.photoBadges}>
+          <View style={styles.cuisineBadge}>
+            <Text style={styles.cuisineBadgeText} numberOfLines={1}>
+              {restaurant.matchedFood?.name ?? "Restaurante"}
+            </Text>
+          </View>
+          {(restaurant.distanceKm ?? 1) < 0.5 && (
+            <View style={styles.nearBadge}>
+              <Text style={styles.nearBadgeText}>🔥 Cerca</Text>
             </View>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.meta}>{restaurant.area}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.meta}>A {(restaurant.distanceKm ?? 0).toFixed(1)} km</Text>
-            {restaurant.rating !== undefined && (
-              <Text style={styles.meta}>
-                ★ {restaurant.rating.toFixed(1)}
-                {restaurant.userRatingCount ? ` (${formatCount(restaurant.userRatingCount)})` : ""}
-              </Text>
-            )}
-            {restaurant.openNow !== undefined && (
-              <Text style={[styles.badge, restaurant.openNow ? styles.badgeOpen : styles.badgeClosed]}>
-                {restaurant.openNow ? "Abierto" : "Cerrado"}
-              </Text>
-            )}
-          </View>
-          <Text style={styles.dishLine} numberOfLines={1}>
-            {restaurant.matchedFood?.name || "Comida cercana"}
-          </Text>
+          )}
         </View>
 
-        <View style={styles.priceBox}>
-          {photoUrl && <Image source={{ uri: photoUrl }} style={styles.photo} resizeMode="cover" />}
-          <Text style={styles.price}>{priceDisplay}</Text>
-          <Text style={styles.booking}>Ver en Maps</Text>
+        {/* top-right: fav button */}
+        <TouchableOpacity
+          style={[styles.favBtn, fav && styles.favBtnOn]}
+          onPress={() => toggleFavorite(restaurant.id)}
+          hitSlop={8}
+        >
+          <Text style={styles.favBtnIcon}>{fav ? "♥" : "♡"}</Text>
+        </TouchableOpacity>
+
+        {/* bottom-left: distance */}
+        <View style={styles.distWrap}>
+          <Text style={styles.distText}>🚶 {distLabel}</Text>
         </View>
       </View>
 
-      {/* acciones */}
+      {/* ── info ── */}
+      <View style={styles.info}>
+        <View style={styles.infoRow}>
+          <Text style={styles.name} numberOfLines={1}>{restaurant.name}</Text>
+          {restaurant.rating !== undefined && (
+            <View style={styles.ratingWrap}>
+              <Text style={styles.ratingStar}>★</Text>
+              <Text style={styles.ratingVal}>{restaurant.rating.toFixed(1)}</Text>
+              {restaurant.userRatingCount !== undefined && (
+                <Text style={styles.ratingCount}>({formatCount(restaurant.userRatingCount)})</Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.metaRow}>
+          {restaurant.openNow !== undefined && (
+            <View style={styles.openWrap}>
+              <View style={[styles.openDot, restaurant.openNow ? styles.openDotOn : styles.openDotOff]} />
+              <Text style={[styles.openText, restaurant.openNow ? styles.openTextOn : styles.openTextOff]}>
+                {restaurant.openNow ? "Abierto" : "Cerrado"}
+              </Text>
+            </View>
+          )}
+          {restaurant.openNow !== undefined && (priceLabel || restaurant.area) && (
+            <Text style={styles.metaSep}>·</Text>
+          )}
+          {priceLabel !== "" && <Text style={styles.priceText}>{priceLabel}</Text>}
+          {priceLabel !== "" && restaurant.area && <Text style={styles.metaSep}>·</Text>}
+          {restaurant.area !== "" && (
+            <Text style={styles.areaText} numberOfLines={1}>{restaurant.area}</Text>
+          )}
+        </View>
+
+        {/* ── tags ── */}
+        {(restaurant.foods?.length ?? 0) > 0 && (
+          <View style={styles.tagsRow}>
+            {restaurant.foods.slice(0, 3).map((f) => (
+              <View key={f.name} style={styles.tag}>
+                <Text style={styles.tagText}>{f.name}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* ── actions ── */}
       <View style={styles.actions}>
         <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => { setSelectedRestaurant(restaurant.id); setView("explore"); }}
+          style={styles.actionPrimary}
+          onPress={() => void Linking.openURL(buildMapsUrl(restaurant))}
         >
-          <Text style={styles.actionText}>Ver en mapa</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => setDetailOpen(true)}>
-          <Text style={styles.actionText}>Detalles</Text>
+          <Text style={styles.actionPrimaryText}>Ver en Maps</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionBtn, fav && styles.actionBtnSaved]}
-          onPress={() => toggleFavorite(restaurant.id)}
+          style={styles.actionSecondary}
+          onPress={() => void Linking.openURL(buildMapsUrl(restaurant, "directions"))}
         >
-          <Text style={[styles.actionText, fav && styles.actionTextSaved]}>{fav ? "Guardado" : "Guardar"}</Text>
+          <Text style={styles.actionSecondaryText}>Ruta 🚶</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, styles.actionAccent]} onPress={() => void Linking.openURL(buildMapsUrl(restaurant))}>
-          <Text style={styles.actionAccentText}>Google Maps</Text>
+        <TouchableOpacity
+          style={styles.actionSecondary}
+          onPress={() => { setSelectedRestaurant(restaurant.id); setView("explore"); }}
+        >
+          <Text style={styles.actionSecondaryText}>Mapa</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, styles.actionAccent]} onPress={() => void Linking.openURL(buildMapsUrl(restaurant, "directions"))}>
-          <Text style={styles.actionAccentText}>Ruta</Text>
+        <TouchableOpacity
+          style={styles.actionSecondary}
+          onPress={() => setDetailOpen(true)}
+        >
+          <Text style={styles.actionSecondaryText}>Info</Text>
         </TouchableOpacity>
       </View>
 
@@ -98,38 +171,96 @@ export default function RestaurantCard({ restaurant }: { restaurant: Restaurant 
 }
 
 const styles = StyleSheet.create({
-  actionAccent: { backgroundColor: theme.accent, borderColor: theme.accent },
-  actionAccentText: { color: "#111015", fontSize: 13, fontWeight: "900" },
-  actionBtn: {
-    alignItems: "center",
-    borderColor: theme.line,
-    borderRadius: 999,
+  card: {
+    backgroundColor: theme.panel,
+    borderRadius: 24,
+    overflow: "hidden",
     borderWidth: 1,
-    flexGrow: 1,
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: 14,
+    borderColor: theme.line,
+    shadowColor: "#14281a",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 28,
+    elevation: 4,
   },
-  actionBtnSaved: { borderColor: theme.accent },
-  actionText: { color: theme.text, fontSize: 13, fontWeight: "900" },
-  actionTextSaved: { color: theme.accent },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 },
-  badge: { borderRadius: 999, fontSize: 12, fontWeight: "900", overflow: "hidden", paddingHorizontal: 9, paddingVertical: 3 },
-  badgeClosed: { backgroundColor: "rgba(255, 118, 118, 0.14)", color: theme.danger },
-  badgeOpen: { backgroundColor: theme.successBg, color: theme.success },
-  booking: { color: theme.muted, fontSize: 12 },
-  card: { backgroundColor: theme.panel, borderColor: theme.line, borderRadius: 20, borderWidth: 1, padding: 16 },
-  cardSelected: { borderColor: "rgba(169, 133, 255, 0.7)" },
-  dishLine: { color: theme.muted, fontSize: 14, marginTop: 2 },
-  info: { flex: 1, minWidth: 0 },
-  meta: { color: theme.muted, fontSize: 14 },
-  metaRow: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 6 },
-  name: { color: theme.text, flex: 1, fontSize: 17, fontWeight: "800", marginRight: 8 },
-  photo: { borderColor: theme.line, borderRadius: 12, borderWidth: 1, height: 72, marginBottom: 8, width: 72 },
-  price: { color: theme.accent, fontSize: 20, fontWeight: "900", marginBottom: 4 },
-  priceBox: { alignItems: "flex-end", marginLeft: 12, minWidth: 88 },
-  statusPill: { alignSelf: "flex-start", backgroundColor: theme.successBg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  statusText: { color: theme.success, fontSize: 12, fontWeight: "900" },
-  titleBlock: { gap: 8, marginBottom: 10 },
-  topRow: { flexDirection: "row" },
+  cardSelected: { borderColor: theme.accent },
+
+  // photo
+  photoWrap: { height: 168, position: "relative" },
+  photo: { width: "100%", height: "100%" },
+  photoFallback: {
+    width: "100%", height: "100%",
+    backgroundColor: "#d1e8d5",
+    alignItems: "center", justifyContent: "center",
+  },
+  photoFallbackIcon: { fontSize: 48 },
+  photoGradient: {
+    position: "absolute", left: 0, right: 0, bottom: 0, height: 80,
+    backgroundColor: "transparent",
+    // React Native doesn't support CSS gradients — use a semi-transparent layer
+    opacity: 0.55,
+  },
+  photoBadges: {
+    position: "absolute", top: 12, left: 12, flexDirection: "row", gap: 8,
+  },
+  cuisineBadge: {
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderRadius: 99, paddingHorizontal: 11, paddingVertical: 5,
+    maxWidth: 160,
+  },
+  cuisineBadgeText: { fontSize: 13, fontWeight: "800", color: "#15241B" },
+  nearBadge: {
+    backgroundColor: theme.accent,
+    borderRadius: 99, paddingHorizontal: 11, paddingVertical: 5,
+  },
+  nearBadgeText: { fontSize: 12.5, fontWeight: "800", color: "#FFFFFF" },
+  favBtn: {
+    position: "absolute", top: 12, right: 12,
+    width: 34, height: 34, borderRadius: 99,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 3,
+  },
+  favBtnOn: { backgroundColor: "#FF4D6D" },
+  favBtnIcon: { fontSize: 17, color: "#15241B", lineHeight: 20 },
+  distWrap: {
+    position: "absolute", bottom: 10, left: 14,
+  },
+  distText: { fontSize: 12.5, fontWeight: "700", color: "#FFFFFF" },
+
+  // info
+  info: { padding: 14 },
+  infoRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 8 },
+  name: { color: theme.text, fontSize: 18.5, fontWeight: "800", letterSpacing: -0.3, flex: 1 },
+  ratingWrap: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
+  ratingStar: { fontSize: 13, color: theme.star },
+  ratingVal: { fontSize: 13, fontWeight: "700", color: theme.text },
+  ratingCount: { fontSize: 12, color: theme.muted2, fontWeight: "500" },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" },
+  openWrap: { flexDirection: "row", alignItems: "center", gap: 5 },
+  openDot: { width: 7, height: 7, borderRadius: 99 },
+  openDotOn: { backgroundColor: theme.accent },
+  openDotOff: { backgroundColor: theme.muted2 },
+  openText: { fontSize: 12.5, fontWeight: "600" },
+  openTextOn: { color: theme.accent },
+  openTextOff: { color: theme.muted },
+  metaSep: { color: theme.muted2, fontSize: 12 },
+  priceText: { fontSize: 12.5, fontWeight: "700", color: theme.accent },
+  areaText: { fontSize: 12.5, color: theme.muted, fontWeight: "600", flexShrink: 1 },
+  tagsRow: { flexDirection: "row", gap: 6, marginTop: 10, flexWrap: "wrap" },
+  tag: { backgroundColor: theme.panel2, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  tagText: { fontSize: 12, fontWeight: "600", color: theme.muted },
+
+  // actions
+  actions: { flexDirection: "row", gap: 8, padding: 14, paddingTop: 0 },
+  actionPrimary: {
+    flex: 1, height: 42, borderRadius: 14, backgroundColor: theme.accent,
+    alignItems: "center", justifyContent: "center",
+  },
+  actionPrimaryText: { color: theme.onAccent, fontSize: 13.5, fontWeight: "800" },
+  actionSecondary: {
+    height: 42, paddingHorizontal: 14, borderRadius: 14,
+    backgroundColor: theme.panel2, alignItems: "center", justifyContent: "center",
+  },
+  actionSecondaryText: { color: theme.text, fontSize: 13, fontWeight: "700" },
 });

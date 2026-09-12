@@ -11,24 +11,29 @@ export function findFoodMatch(restaurant: Restaurant, query: string): FoodMatch 
   });
 }
 
-export function getFilteredResults(queryValue: string): Restaurant[] {
+export function getFilteredResults(queryValue: string, maxDistanceKm?: number): Restaurant[] {
   const query = normalizeText(queryValue);
   const { maxPrice: maxPriceSetting, defaultRadiusKm, openNow } = state.settings;
   const maxPrice = maxPriceSetting === "all" ? Infinity : Number(maxPriceSetting);
-  const maxDistance = defaultRadiusKm === "all" ? Infinity : Number(defaultRadiusKm);
+  const maxDistance = maxDistanceKm != null
+    ? maxDistanceKm
+    : defaultRadiusKm === "all" ? Infinity : Number(defaultRadiusKm);
   const favoriteIds = new Set(state.favorites.map((item) => item.id));
 
   return state.activeRestaurants
     .map((restaurant) => {
+      const distanceKm = getDistanceKm(state.currentLocation, restaurant);
+      if (distanceKm > maxDistance) return null;
+      if (openNow && restaurant.openNow === false) return null;
+
+      // Sin texto de búsqueda: incluir todos los restaurantes sin filtrar por comida
+      if (!query) {
+        return { ...restaurant, distanceKm, matchedFood: restaurant.foods[0] };
+      }
+
       const food = findFoodMatch(restaurant, query);
       if (!food) return null;
       if (food.price !== null && food.price > maxPrice) return null;
-
-      const distanceKm = getDistanceKm(state.currentLocation, restaurant);
-      if (distanceKm > maxDistance) return null;
-
-      // Solo filtrar cerrados cuando sabemos con certeza que está cerrado
-      if (openNow && restaurant.openNow === false) return null;
 
       return { ...restaurant, distanceKm, matchedFood: food };
     })

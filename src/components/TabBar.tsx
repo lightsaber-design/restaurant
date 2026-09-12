@@ -3,18 +3,20 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { setView } from "../state/store";
 import { theme } from "../theme";
+import { Icon } from "./Icon";
 import type { ViewName } from "../types";
 
-type Tab = { id: ViewName; label: string; icon: string };
+type Tab = { id: ViewName; label: string; icon: string; iconActive: string };
 
-// Orden y símbolos igual que .bottom-nav del index.html
+// Iconos Material Symbols, igual que el diseño
 const TABS: Tab[] = [
-  { id: "explore", label: "Inicio", icon: "⌂" },
-  { id: "favorites", label: "Favoritos", icon: "♡" },
-  { id: "profile", label: "Perfil", icon: "♟" },
+  { id: "explore", label: "Explorar", icon: "explore", iconActive: "explore" },
+  { id: "search", label: "Buscar", icon: "search", iconActive: "search" },
+  { id: "favorites", label: "Favoritos", icon: "favorite-border", iconActive: "favorite" },
+  { id: "profile", label: "Perfil", icon: "person-outline", iconActive: "person" },
 ];
 
-export default function TabBar({ activeView }: { activeView: ViewName }) {
+export default function TabBar({ activeView, favCount = 0 }: { activeView: ViewName; favCount?: number }) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -22,9 +24,27 @@ export default function TabBar({ activeView }: { activeView: ViewName }) {
       {TABS.map((tab) => {
         const active = tab.id === activeView;
         return (
-          <TouchableOpacity key={tab.id} style={styles.tab} onPress={() => setView(tab.id)} activeOpacity={0.7}>
-            <Text style={[styles.icon, active && styles.active]}>{tab.icon}</Text>
-            <Text style={[styles.label, active && styles.active]}>{tab.label}</Text>
+          <TouchableOpacity
+            key={tab.id}
+            style={styles.tab}
+            onPress={() => setView(tab.id)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.pill, active && styles.pillActive]}>
+              <View style={styles.iconWrap}>
+                <Icon
+                  name={active ? tab.iconActive : tab.icon}
+                  size={24}
+                  color={active ? theme.onPrimaryContainer : theme.muted}
+                />
+                {tab.id === "favorites" && favCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{favCount > 9 ? "9+" : favCount}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.label, active && styles.labelActive]}>{tab.label}</Text>
+            </View>
           </TouchableOpacity>
         );
       })}
@@ -33,15 +53,37 @@ export default function TabBar({ activeView }: { activeView: ViewName }) {
 }
 
 const styles = StyleSheet.create({
-  active: { color: theme.accent },
-  container: {
-    backgroundColor: "rgba(8, 9, 13, 0.98)",
-    borderTopColor: theme.line,
-    borderTopWidth: 1,
-    flexDirection: "row",
-    paddingTop: 10,
+  badge: {
+    position: "absolute", top: -5, right: -8,
+    minWidth: 16, height: 16, borderRadius: 99,
+    backgroundColor: theme.secondaryContainer,
+    alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2, borderColor: theme.panel,
   },
-  icon: { color: theme.muted, fontSize: 26, fontWeight: "900", marginBottom: 2 },
-  label: { color: theme.muted, fontSize: 12.5, fontWeight: "700" },
-  tab: { alignItems: "center", flex: 1, minHeight: 54, justifyContent: "center" },
+  badgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  container: {
+    backgroundColor: theme.panel,
+    borderTopLeftRadius: 18, borderTopRightRadius: 18,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingTop: 8,
+    paddingHorizontal: 8,
+    // sombra verde de marca hacia arriba
+    shadowColor: theme.accent, shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06, shadowRadius: 14, elevation: 12,
+  },
+  tab: { flex: 1, alignItems: "center" },
+  pill: {
+    alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 16, paddingVertical: 6, borderRadius: 99,
+    minHeight: 44,
+  },
+  pillActive: { backgroundColor: theme.primaryContainer },
+  icon: { color: theme.muted, fontSize: 22, fontWeight: "900" },
+  iconActive: { color: theme.onPrimaryContainer },
+  iconWrap: { position: "relative", marginBottom: 1 },
+  label: { color: theme.muted, fontSize: 11, fontWeight: "700" },
+  labelActive: { color: theme.onPrimaryContainer, fontWeight: "800" },
 });

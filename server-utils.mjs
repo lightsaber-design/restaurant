@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 export const defaultServerConfig = {
   cacheTtlMs: 24 * 60 * 60 * 1000,
   googlePlacesRadiusMeters: 5000,
-  maxPlacesResults: 12,
+  maxPlacesResults: 20,
   rateLimitMaxRequests: 30,
   rateLimitWindowMs: 60 * 1000,
 };

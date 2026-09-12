@@ -262,7 +262,7 @@ dom.priceFilter.addEventListener("change", () => {
 });
 dom.distanceFilter.addEventListener("change", () => {
   const value = dom.distanceFilter.value;
-  if (value === "all" || value === "1" || value === "3" || value === "5") updateSettings({ defaultRadiusKm: value });
+  { const n = Number(value); if (!isNaN(n) && n > 0) updateSettings({ defaultRadiusKm: value }); }
 });
 dom.sortFilter.addEventListener("change", () => {
   const value = dom.sortFilter.value;
@@ -286,7 +286,7 @@ dom.languageSetting.addEventListener("change", () => {
 });
 dom.radiusSetting.addEventListener("change", () => {
   const value = dom.radiusSetting.value;
-  if (value === "all" || value === "1" || value === "3" || value === "5") updateSettings({ defaultRadiusKm: value });
+  { const n = Number(value); if (!isNaN(n) && n > 0) updateSettings({ defaultRadiusKm: value }); }
 });
 dom.budgetSetting.addEventListener("change", () => {
   const value = dom.budgetSetting.value;

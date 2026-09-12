@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AntojoLogo } from "../components/AntojoLogo";
+import { Icon } from "../components/Icon";
 import { useAppState } from "../hooks/useAppState";
 import { fetchLocationSuggestions, getShortLocationName } from "../providers/geocodingProvider";
 import { clearLocalAppData, setCurrentLocation, updateSettings } from "../state/store";
@@ -170,11 +171,11 @@ function ExpandRow({ icon, label, value, id, openId, setOpenId, last, children }
     <View style={{ borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: theme.line }}>
       <TouchableOpacity style={er.row} onPress={toggle} activeOpacity={0.7}>
         <View style={er.iconSquare}>
-          <Text style={er.iconText}>{icon}</Text>
+          <Icon name={icon} size={17} color={theme.accent} />
         </View>
         <Text style={er.label}>{label}</Text>
         <Text style={er.value}>{value}</Text>
-        <Text style={[er.chevron, open && er.chevronOpen]}>›</Text>
+        <Icon name={open ? "expand-less" : "expand-more"} size={20} color={theme.muted2} />
       </TouchableOpacity>
 
       {Platform.OS === "web" ? (
@@ -207,7 +208,7 @@ function ToggleRow({ icon, title, sub, value, onChange, last }: {
   return (
     <View style={[tr.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.line }]}>
       <View style={tr.iconSquare}>
-        <Text style={tr.iconText}>{icon}</Text>
+        <Icon name={icon} size={17} color={theme.accent} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={tr.title}>{title}</Text>
@@ -331,7 +332,7 @@ export default function ProfileScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerLogo}>
-            <AntojoLogo size={20} c="#FFFFFF" bg={theme.accent} bite="#FF6B4A" />
+            <AntojoLogo size={20} c="#FFFFFF" bg={theme.accent} bite={theme.secondary} />
           </View>
           <Text style={styles.headerTitle}>Perfil</Text>
         </View>
@@ -357,14 +358,15 @@ export default function ProfileScreen() {
         <Group label="Ubicación">
           <View style={styles.locRow}>
             <View style={[er.iconSquare, { backgroundColor: theme.accentSoft }]}>
-              <Text style={er.iconText}>📍</Text>
+              <Icon name="place" size={17} color={theme.accent} />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.locName} numberOfLines={1}>{appState.currentLocation.label}</Text>
               <Text style={styles.locSub}>Ubicación actual</Text>
             </View>
             <TouchableOpacity style={styles.cambiarBtn} onPress={toggleLocPanel} activeOpacity={0.75}>
-              <Text style={styles.cambiarText}>⊙ Cambiar</Text>
+              <Icon name="my-location" size={14} color={theme.text} />
+              <Text style={styles.cambiarText}>Cambiar</Text>
             </TouchableOpacity>
           </View>
 
@@ -409,27 +411,27 @@ export default function ProfileScreen() {
 
         {/* Preferencias */}
         <Group label="Preferencias">
-          <ExpandRow icon="🌍" label="Idioma" value={LANG_LABELS[s.language] ?? s.language} id="lang" openId={openId} setOpenId={setOpenId}>
+          <ExpandRow icon="language" label="Idioma" value={LANG_LABELS[s.language] ?? s.language} id="lang" openId={openId} setOpenId={setOpenId}>
             <PillGroup
               options={["Español", "English", "Français", "Deutsch", "Italiano", "Português"]}
               value={LANG_LABELS[s.language] ?? s.language}
               onChange={(v) => updateSettings({ language: (LANG_TO_STORE[v] ?? "es") as typeof s.language })}
             />
           </ExpandRow>
-          <ExpandRow icon="⊙" label="Radio de búsqueda" value={RADIUS_TO_LABEL[s.defaultRadiusKm] ?? `${s.defaultRadiusKm} km`} id="radius" openId={openId} setOpenId={setOpenId}>
+          <ExpandRow icon="radar" label="Radio de búsqueda" value={RADIUS_TO_LABEL[s.defaultRadiusKm] ?? `${s.defaultRadiusKm} km`} id="radius" openId={openId} setOpenId={setOpenId}>
             <RadiusSlider
               value={RADIUS_TO_LABEL[s.defaultRadiusKm] ?? "3 km"}
               onChange={(v) => updateSettings({ defaultRadiusKm: RADIUS_TO_STORE[v] ?? "3" })}
             />
           </ExpandRow>
-          <ExpandRow icon="★" label="Presupuesto" value={BUDGET_LABELS[s.budgetLevel] ?? s.budgetLevel} id="budget" openId={openId} setOpenId={setOpenId}>
+          <ExpandRow icon="payments" label="Presupuesto" value={BUDGET_LABELS[s.budgetLevel] ?? s.budgetLevel} id="budget" openId={openId} setOpenId={setOpenId}>
             <PillGroup
               options={["Cualquiera", "Económico", "Medio", "Premium"]}
               value={BUDGET_LABELS[s.budgetLevel] ?? "Cualquiera"}
               onChange={(v) => updateSettings({ budgetLevel: (BUDGET_TO_STORE[v] ?? "any") as typeof s.budgetLevel })}
             />
           </ExpandRow>
-          <ExpandRow icon="🗺" label="Abrir en Maps" value={MAPS_LABELS[s.mapsMode] ?? s.mapsMode} id="maps" openId={openId} setOpenId={setOpenId} last>
+          <ExpandRow icon="map" label="Abrir en Maps" value={MAPS_LABELS[s.mapsMode] ?? s.mapsMode} id="maps" openId={openId} setOpenId={setOpenId} last>
             <PillGroup
               options={["Dentro de la app", "Nueva pestaña", "App externa"]}
               value={MAPS_LABELS[s.mapsMode] ?? "Nueva pestaña"}
@@ -440,13 +442,13 @@ export default function ProfileScreen() {
 
         {/* Avisos */}
         <Group label="Avisos">
-          <ToggleRow icon="🔔" title="Notificaciones" sub="Nuevos lugares cerca de ti" value={notifications} onChange={setNotifications} />
-          <ToggleRow icon="🕐" title="Solo lugares abiertos" sub="Oculta los cerrados al buscar" value={s.openNow} onChange={(v) => updateSettings({ openNow: v })} last />
+          <ToggleRow icon="notifications-none" title="Notificaciones" sub="Nuevos lugares cerca de ti" value={notifications} onChange={setNotifications} />
+          <ToggleRow icon="schedule" title="Solo lugares abiertos" sub="Oculta los cerrados al buscar" value={s.openNow} onChange={(v) => updateSettings({ openNow: v })} last />
         </Group>
 
         {/* Avanzado */}
         <Group label="Avanzado">
-          <ToggleRow icon="⚙" title="Modo desarrollador" value={s.developerMode} onChange={(v) => updateSettings({ developerMode: v })} last={!s.developerMode} />
+          <ToggleRow icon="code" title="Modo desarrollador" value={s.developerMode} onChange={(v) => updateSettings({ developerMode: v })} last={!s.developerMode} />
           {s.developerMode && (
             <View style={styles.devPanel}>
               {[

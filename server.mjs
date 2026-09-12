@@ -74,7 +74,13 @@ const mimeTypes = {
 };
 
 // ── Optimización 11: Connection: keep-alive en cabeceras base ────────────────
-const BASE_HEADERS = { "Connection": "keep-alive", "Keep-Alive": "timeout=30" };
+const BASE_HEADERS = {
+  "Connection": "keep-alive",
+  "Keep-Alive": "timeout=30",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Accept",
+};
 
 // ── Optimización 8: compresión gzip cuando el cliente la acepta ──────────────
 function sendJson(response, statusCode, body, headers = {}, acceptEncoding = "") {
@@ -228,7 +234,9 @@ async function handlePlacesSearch(request, response) {
     : config.googlePlacesRadiusMeters;
   const maxResultCount = radiusParam === "1" ? 5 : radiusParam === "3" ? 8 : config.maxPlacesResults;
 
-  const cacheKey = getPlacesCacheKey(query, latitude, longitude);
+  // El radio forma parte de la clave: una búsqueda a 1 km y otra a 20 km del
+  // mismo término NO deben compartir caché (antes devolvía el set estrecho viejo).
+  const cacheKey = `${getPlacesCacheKey(query, latitude, longitude)}:r${radiusParam || "def"}`;
 
   // ── Optimización 6: stale-while-revalidate ───────────────────────────────
   const cacheResult = getCachedPlaces(placesCacheDatabase, cacheKey, config.cacheTtlMs);
@@ -364,6 +372,12 @@ function serveStatic(request, response) {
 }
 
 createServer((request, response) => {
+  if (request.method === "OPTIONS") {
+    response.writeHead(204, BASE_HEADERS);
+    response.end();
+    return;
+  }
+
   if (request.url.startsWith("/api/places/search")) {
     handlePlacesSearch(request, response).catch((error) => {
       logger.error("unexpected_error", { message: error.message });

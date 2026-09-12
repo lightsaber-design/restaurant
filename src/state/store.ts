@@ -5,8 +5,9 @@ import { normalizeText } from "../utils/format";
 
 const listeners = new Set<(state: AppState) => void>();
 const defaultSettings: AppState["settings"] = {
+  autoLocate: false,
   budgetLevel: "any",
-  defaultRadiusKm: "all",
+  defaultRadiusKm: "5",
   developerMode: false,
   favoriteListFilter: "all",
   favoriteNearOnly: false,
@@ -95,7 +96,7 @@ export function addRecentSearch(dish: string): void {
 
 export function triggerSearch(dish: string): void {
   state.pendingSearch = dish.trim();
-  state.view = "explore";
+  state.view = "search";
   notify();
 }
 

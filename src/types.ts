@@ -1,4 +1,4 @@
-export type ViewName = "explore" | "favorites" | "profile";
+export type ViewName = "explore" | "search" | "favorites" | "profile";
 
 export type LocationPoint = {
   label: string;
@@ -88,7 +88,8 @@ export type SearchHistoryItem = {
 
 export type AppSettings = {
   budgetLevel: "any" | "cheap" | "medium" | "premium";
-  defaultRadiusKm: "all" | "1" | "3" | "5";
+  autoLocate: boolean;
+  defaultRadiusKm: string;
   developerMode: boolean;
   favoriteListFilter: string;
   favoriteNearOnly: boolean;

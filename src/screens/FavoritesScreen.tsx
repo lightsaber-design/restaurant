@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Alert,
+  Image,
   Linking,
   Modal,
   ScrollView,
@@ -20,8 +21,15 @@ import type { FavoriteRestaurant } from "../types";
 import { getDistanceKm } from "../utils/geo";
 import { appConfig } from "../config";
 import { AntojoLogo } from "../components/AntojoLogo";
+import { Icon } from "../components/Icon";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function photoUrl(photoName?: string): string | null {
+  return photoName
+    ? `${appConfig.api.baseUrl}/api/places/photo?name=${encodeURIComponent(photoName)}`
+    : null;
+}
 
 function buildFavoriteMapsUrl(fav: FavoriteRestaurant, mode: "search" | "directions" = "search"): string {
   if (fav.googleMapsUri && mode === "search") return fav.googleMapsUri;
@@ -56,7 +64,7 @@ function AddCategoryModal({ saved, onClose }: { saved: string[]; onClose: () => 
           <View style={styles.addCatHead}>
             <Text style={styles.addCatTitle}>Añadir categoría</Text>
             <TouchableOpacity onPress={onClose} hitSlop={12}>
-              <Text style={styles.addCatClose}>×</Text>
+              <Icon name="close" size={26} color={theme.text} />
             </TouchableOpacity>
           </View>
 
@@ -137,7 +145,7 @@ function SavedCategoriesSection({ saved }: { saved: string[] }) {
   return (
     <View style={styles.catSection}>
       <View style={styles.catSectionHead}>
-        <Text style={styles.catSectionTitle}>Mis categorías</Text>
+        <Text style={styles.catSectionTitle}>Categorías Favoritas</Text>
         <TouchableOpacity style={styles.addCatOpenBtn} onPress={() => setAddOpen(true)}>
           <Text style={styles.addCatOpenBtnText}>+ Añadir</Text>
         </TouchableOpacity>
@@ -148,24 +156,28 @@ function SavedCategoriesSection({ saved }: { saved: string[] }) {
           <Text style={styles.catEmptyText}>Añade categorías para buscar rápido ✦</Text>
         </TouchableOpacity>
       ) : (
-        <View style={styles.catChips}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRail}>
           {saved.map((cat) => (
-            <View key={cat} style={styles.catChip}>
-              <TouchableOpacity style={styles.catChipLabel} onPress={() => triggerSearch(cat)}>
-                <Text style={styles.catChipText}>
-                  {getCatEmoji(cat) ? `${getCatEmoji(cat)} ` : "★ "}
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => removeCategory(cat)} hitSlop={8} style={styles.catChipRemove}>
-                <Text style={styles.catChipRemoveText}>×</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity key={cat} style={styles.catItem} onPress={() => triggerSearch(cat)} activeOpacity={0.75}>
+              <View style={styles.catCircle}>
+                {getCatEmoji(cat) ? (
+                  <Text style={styles.catCircleEmoji}>{getCatEmoji(cat)}</Text>
+                ) : (
+                  <Icon name="star" size={26} color={theme.onPrimaryContainer} />
+                )}
+              </View>
+              <Text style={styles.catItemLabel} numberOfLines={1}>
+                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              </Text>
+            </TouchableOpacity>
           ))}
-          <TouchableOpacity style={styles.catChipAdd} onPress={() => setAddOpen(true)}>
-            <Text style={styles.catChipAddText}>+</Text>
+          <TouchableOpacity style={styles.catItem} onPress={() => setAddOpen(true)} activeOpacity={0.75}>
+            <View style={styles.catCircleAdd}>
+              <Text style={styles.catCircleAddText}>+</Text>
+            </View>
+            <Text style={styles.catItemLabel}>Añadir</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       )}
 
       {addOpen && <AddCategoryModal saved={saved} onClose={() => setAddOpen(false)} />}
@@ -203,25 +215,57 @@ function FavoriteCard({
 
   const editableLists = allLists.length > 0 ? allLists : [item.list || "Pendientes"];
 
+  const url = photoUrl(restaurant?.photoName);
+  const cuisineLine = [restaurant?.matchedFood?.name, item.area].filter(Boolean).join(" · ");
+
+  function confirmRemove() {
+    Alert.alert("Quitar favorito", `¿Quitar "${item.name}"?`, [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Quitar", style: "destructive", onPress: () => removeFavorite(item.id) },
+    ]);
+  }
+
   return (
     <View style={styles.card}>
-      <View style={styles.cardHead}>
-        {compareMode && (
-          <TouchableOpacity onPress={onToggleSelect} style={styles.check}>
-            <Text style={styles.checkText}>{selected ? "☑" : "☐"}</Text>
+      {/* Image header */}
+      <View style={styles.cardImageWrap}>
+        {url ? (
+          <Image source={{ uri: url }} style={styles.cardImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.cardImage, styles.cardImageFallback]}>
+            <Text style={{ fontSize: 40 }}>🍴</Text>
+          </View>
+        )}
+        {restaurant?.rating !== undefined && (
+          <View style={styles.cardRating}>
+            <Icon name="star" size={13} color={theme.star} />
+            <Text style={styles.cardRatingText}>{restaurant.rating.toFixed(1)}</Text>
+          </View>
+        )}
+        {compareMode ? (
+          <TouchableOpacity onPress={onToggleSelect} style={styles.cardCheck}>
+            <Icon name={selected ? "check-box" : "check-box-outline-blank"} size={24} color={selected ? theme.accent : theme.muted2} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.cardHeart} onPress={confirmRemove} hitSlop={8}>
+            <Icon name="favorite" size={20} color={theme.heart} />
           </TouchableOpacity>
         )}
-        <View style={styles.titleGroup}>
-          <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-          <View style={styles.statusPill}><Text style={styles.statusText}>{item.list || "Pendientes"}</Text></View>
-        </View>
-        <TouchableOpacity onPress={() => setExpanded((v) => !v)} hitSlop={10}>
-          <Text style={styles.expand}>{expanded ? "▲" : "▼"}</Text>
-        </TouchableOpacity>
       </View>
 
-      <Text style={styles.area} numberOfLines={1}>{item.area}</Text>
-      <Text style={styles.distance}>{distanceLabel}</Text>
+      <View style={styles.cardBody}>
+        <View style={styles.cardHead}>
+          <View style={styles.titleGroup}>
+            <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+            <View style={styles.statusPill}><Text style={styles.statusText}>{item.list || "Pendientes"}</Text></View>
+          </View>
+          <TouchableOpacity onPress={() => setExpanded((v) => !v)} hitSlop={10}>
+            <Icon name={expanded ? "expand-less" : "expand-more"} size={22} color={theme.muted2} />
+          </TouchableOpacity>
+        </View>
+
+        {cuisineLine ? <Text style={styles.area} numberOfLines={1}>{cuisineLine}</Text> : null}
+        <Text style={styles.distance}>{distanceLabel}</Text>
 
       {item.tags && item.tags.length > 0 && (
         <View style={styles.tagRow}>
@@ -284,24 +328,26 @@ function FavoriteCard({
       <View style={styles.actions}>
         {item.googleMapsUri && (
           <TouchableOpacity style={styles.actionBtn} onPress={() => void Linking.openURL(buildFavoriteMapsUrl(item))}>
+            <Icon name="place" size={15} color={theme.text} />
             <Text style={styles.actionText}>Maps</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.actionBtn} onPress={() => void Linking.openURL(buildFavoriteMapsUrl(item, "directions"))}>
+          <Icon name="directions" size={15} color={theme.text} />
           <Text style={styles.actionText}>Ruta</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn} onPress={() => void shareFavorite()}>
+          <Icon name="share" size={15} color={theme.text} />
           <Text style={styles.actionText}>Compartir</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, styles.actionDanger]}
-          onPress={() => Alert.alert("Quitar favorito", `¿Quitar "${item.name}"?`, [
-            { text: "Cancelar", style: "cancel" },
-            { text: "Quitar", style: "destructive", onPress: () => removeFavorite(item.id) },
-          ])}
+          onPress={confirmRemove}
         >
+          <Icon name="delete-outline" size={15} color={theme.danger} />
           <Text style={styles.actionDangerText}>Quitar</Text>
         </TouchableOpacity>
+      </View>
       </View>
     </View>
   );
@@ -317,7 +363,7 @@ function CompareModal({ favorites, onClose }: { favorites: FavoriteRestaurant[];
         <View style={styles.compareDialog}>
           <View style={styles.compareHead}>
             <Text style={styles.compareTitle}>Comparar favoritos</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={10}><Text style={styles.compareClose}>×</Text></TouchableOpacity>
+            <TouchableOpacity onPress={onClose} hitSlop={10}><Icon name="close" size={24} color={theme.text} /></TouchableOpacity>
           </View>
           <ScrollView>
             {favorites.map((fav) => {
@@ -399,13 +445,16 @@ export default function FavoritesScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <View style={styles.headerLogo}>
-            <AntojoLogo size={20} c="#FFFFFF" bg={theme.accent} bite="#FF6B4A" />
+        <View style={styles.headerTop}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={styles.headerLogo}>
+              <AntojoLogo size={20} c="#FFFFFF" bg={theme.accent} bite={theme.secondaryContainer} />
+            </View>
+            <Text style={styles.title}>Favoritos</Text>
           </View>
-          <Text style={styles.title}>Favoritos</Text>
+          <View style={styles.countPill}><Text style={styles.countText}>{appState.favorites.length}</Text></View>
         </View>
-        <View style={styles.countPill}><Text style={styles.countText}>{appState.favorites.length}</Text></View>
+        <Text style={styles.subtitle}>Tus rincones gastronómicos preferidos, listos para tu próximo antojo.</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -511,7 +560,7 @@ export default function FavoritesScreen() {
 
 const styles = StyleSheet.create({
   // Favoritos card
-  actionBtn: { alignItems: "center", borderColor: theme.line, borderRadius: 999, borderWidth: 1, flexGrow: 1, justifyContent: "center", minHeight: 42, paddingHorizontal: 14 },
+  actionBtn: { flexDirection: "row", gap: 5, alignItems: "center", borderColor: theme.line, borderRadius: 999, borderWidth: 1, flexGrow: 1, justifyContent: "center", minHeight: 42, paddingHorizontal: 12 },
   actionDanger: { borderColor: theme.dangerBorder, backgroundColor: theme.dangerBg },
   actionDangerText: { color: theme.danger, fontSize: 13, fontWeight: "900" },
   actionText: { color: theme.text, fontSize: 13, fontWeight: "900" },
@@ -522,10 +571,21 @@ const styles = StyleSheet.create({
   barBtnText: { color: theme.text, fontSize: 13, fontWeight: "900" },
   barBtnTextActive: { color: "#FFFFFF" },
   barRow: { flexDirection: "row", gap: 8, marginBottom: 18 },
-  card: { backgroundColor: theme.panel, borderColor: theme.line, borderRadius: 20, borderWidth: 1, padding: 16 },
+  card: { backgroundColor: theme.panel, borderColor: theme.line, borderRadius: 20, borderWidth: 1, overflow: "hidden", shadowColor: theme.accent, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 3 },
+  cardBody: { padding: 16 },
   cardHead: { alignItems: "center", flexDirection: "row", marginBottom: 4 },
-  check: { marginRight: 10 },
-  checkText: { color: theme.accent, fontSize: 22 },
+
+  // Image header
+  cardImageWrap: { height: 170, position: "relative" },
+  cardImage: { width: "100%", height: 170 },
+  cardImageFallback: { backgroundColor: theme.panel2, alignItems: "center", justifyContent: "center" },
+  cardRating: { position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.92)", borderRadius: 99, paddingHorizontal: 9, paddingVertical: 5 },
+  cardRatingStar: { fontSize: 12, color: theme.star },
+  cardRatingText: { fontSize: 12.5, fontWeight: "800", color: theme.text },
+  cardHeart: { position: "absolute", top: 12, right: 12, width: 40, height: 40, borderRadius: 99, backgroundColor: "rgba(255,255,255,0.88)", alignItems: "center", justifyContent: "center" },
+  cardHeartIcon: { fontSize: 20, color: theme.heart },
+  cardCheck: { position: "absolute", top: 12, right: 12, width: 40, height: 40, borderRadius: 99, backgroundColor: "rgba(255,255,255,0.92)", alignItems: "center", justifyContent: "center" },
+  cardCheckText: { color: theme.accent, fontSize: 22 },
 
   // Modal de añadir categorías
   addCatBtn: { alignItems: "center", backgroundColor: theme.accent, borderRadius: 12, height: 46, justifyContent: "center", width: 46 },
@@ -617,6 +677,15 @@ const styles = StyleSheet.create({
   },
   catSectionHead: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
   catSectionTitle: { color: theme.text, fontSize: 17, fontWeight: "800" },
+
+  // Circular rail
+  catRail: { gap: 18, paddingVertical: 2, paddingRight: 4 },
+  catItem: { alignItems: "center", width: 66 },
+  catCircle: { width: 60, height: 60, borderRadius: 99, backgroundColor: theme.primaryContainer, alignItems: "center", justifyContent: "center", marginBottom: 7, shadowColor: theme.accent, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.22, shadowRadius: 14, elevation: 4 },
+  catCircleEmoji: { fontSize: 26 },
+  catCircleAdd: { width: 60, height: 60, borderRadius: 99, backgroundColor: theme.panel2, borderWidth: 1.5, borderColor: theme.line, borderStyle: "dashed", alignItems: "center", justifyContent: "center", marginBottom: 7 },
+  catCircleAddText: { fontSize: 28, fontWeight: "700", color: theme.muted2 },
+  catItemLabel: { fontSize: 11.5, fontWeight: "700", color: theme.muted, textAlign: "center" },
   addCatOpenBtn: { backgroundColor: theme.accent, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   addCatOpenBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
 
@@ -640,7 +709,9 @@ const styles = StyleSheet.create({
   emptyText: { color: theme.muted, fontSize: 14, lineHeight: 21, marginTop: 6 },
   emptyTitle: { color: theme.text, fontSize: 18, fontWeight: "800" },
   expand: { color: theme.muted2, fontSize: 14, padding: 4 },
-  header: { alignItems: "center", backgroundColor: theme.bgTop, borderBottomColor: theme.line, borderBottomWidth: 1, flexDirection: "row", justifyContent: "space-between", paddingBottom: 14, paddingHorizontal: 16 },
+  header: { backgroundColor: theme.bgTop, borderBottomColor: theme.line, borderBottomWidth: 1, paddingBottom: 14, paddingHorizontal: 16 },
+  headerTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  subtitle: { color: theme.muted, fontSize: 13.5, lineHeight: 19, marginTop: 8, maxWidth: "92%" },
   headerLogo: { width: 32, height: 32, borderRadius: 10, backgroundColor: theme.accent, alignItems: "center", justifyContent: "center" },
   list: { gap: 14 },
   listChip: { backgroundColor: theme.inputBg, borderColor: theme.line, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },

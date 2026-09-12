@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { AntojoLogo } from "./AntojoLogo";
+import { theme } from "../theme";
 
 interface Props {
   onDone: () => void;
@@ -13,13 +14,13 @@ function MapGrid({ width, height }: { width: number; height: number }) {
       {Array.from({ length: 8 }, (_, i) => (
         <View
           key={"h" + i}
-          style={{ position: "absolute", left: 0, right: 0, top: 40 + i * (height / 7), height: 1.5, backgroundColor: "#DDE6D8" }}
+          style={{ position: "absolute", left: 0, right: 0, top: 40 + i * (height / 7), height: 1.5, backgroundColor: "rgba(0,107,45,0.08)" }}
         />
       ))}
       {Array.from({ length: 6 }, (_, i) => (
         <View
           key={"v" + i}
-          style={{ position: "absolute", top: 0, bottom: 0, left: 30 + i * (width / 5), width: 1.5, backgroundColor: "#DDE6D8" }}
+          style={{ position: "absolute", top: 0, bottom: 0, left: 30 + i * (width / 5), width: 1.5, backgroundColor: "rgba(0,107,45,0.08)" }}
         />
       ))}
     </View>
@@ -82,7 +83,7 @@ export function SplashScreen({ onDone }: Props) {
             { transform: [{ translateY: dropY }], opacity: dropOpacity },
           ]}
         >
-          <AntojoLogo size={96} c="#16A34A" bg="#FFFFFF" bite="#FF6B4A" />
+          <AntojoLogo size={96} c={theme.accent} bg="#FFFFFF" bite={theme.secondary} />
         </Animated.View>
 
         {/* Cast shadow under pin */}
@@ -106,7 +107,7 @@ export function SplashScreen({ onDone }: Props) {
 const styles = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "#EEF3E9",
+    backgroundColor: theme.bg,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 999,
@@ -133,7 +134,7 @@ const styles = StyleSheet.create({
     marginTop: 26,
     fontSize: 38,
     fontWeight: "800",
-    color: "#15241B",
+    color: theme.accent,
     letterSpacing: -1.2,
   },
   tagline: {
@@ -141,6 +142,6 @@ const styles = StyleSheet.create({
     bottom: 52,
     fontSize: 13.5,
     fontWeight: "700",
-    color: "#5F6E63",
+    color: theme.muted,
   },
 });

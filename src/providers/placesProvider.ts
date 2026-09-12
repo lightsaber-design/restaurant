@@ -11,10 +11,10 @@ type PlacesResponse = {
 const PLACES_SESSION_TTL_MS = 5 * 60 * 1000;
 const sessionCache = new Map<string, { results: Restaurant[]; at: number }>();
 
-function getSessionKey(query: string, latitude: number, longitude: number): string {
+function getSessionKey(query: string, latitude: number, longitude: number, radiusKm: string): string {
   const latCell = (Math.floor(latitude * 20) + 0.5) / 20;
   const lonCell = (Math.floor(longitude * 20) + 0.5) / 20;
-  return `${normalizeText(query)}:${latCell}:${lonCell}`;
+  return `${normalizeText(query)}:${latCell}:${lonCell}:r${radiusKm}`;
 }
 
 function fromSessionCache(key: string): Restaurant[] | null {
@@ -61,7 +61,7 @@ export async function fetchNearbyRestaurants(
   longitude: number,
   radiusKm: string = "all",
 ): Promise<Restaurant[]> {
-  const sessionKey = getSessionKey(query, latitude, longitude);
+  const sessionKey = getSessionKey(query, latitude, longitude, radiusKm);
   const cached = fromSessionCache(sessionKey);
   if (cached) return cached;
 
